@@ -1,0 +1,48 @@
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800">Projects</h1>
+    <p class="text-gray-500 text-sm mt-1">Manage development projects</p>
+  </div>
+  <a href="/invoices/projects/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    New Project
+  </a>
+</div>
+
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-gray-600">Project</th>
+        <th class="text-left px-5 py-3 font-semibold text-gray-600">Client</th>
+        <th class="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
+        <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% if (projects.length === 0) { %>
+        <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400">No projects yet.</td></tr>
+      <% } %>
+      <% projects.forEach(p => { %>
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-5 py-3">
+            <p class="font-medium text-gray-800"><%= p.project_name %></p>
+            <% if (p.description) { %><p class="text-xs text-gray-400 truncate max-w-sm"><%= p.description %></p><% } %>
+          </td>
+          <td class="px-5 py-3 text-gray-600"><%= p.client_name %> <% if (p.company) { %><span class="text-gray-400">(<%= p.company %>)</span><% } %></td>
+          <td class="px-5 py-3 text-center">
+            <% const pc = {active:'bg-emerald-100 text-emerald-700',completed:'bg-blue-100 text-blue-700',cancelled:'bg-gray-100 text-gray-500'}; %>
+            <span class="px-2.5 py-1 rounded-full text-xs font-medium <%= pc[p.status] %>"><%= p.status %></span>
+          </td>
+          <td class="px-5 py-3 text-right space-x-2">
+            <a href="/invoices/create?project_id=<%= p.id %>" class="text-emerald-600 hover:text-emerald-500 font-medium text-xs">+ Invoice</a>
+            <a href="/invoices/projects/<%= p.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
+            <form method="POST" action="/invoices/projects/<%= p.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
+              <button type="submit" class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

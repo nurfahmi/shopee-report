@@ -1,0 +1,61 @@
+<div class="max-w-lg">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">Currency Converter</h1>
+
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
+    <div class="text-center text-sm text-gray-500">
+      Rate: <strong>1 MYR = <%= myrToIdr.toLocaleString() %> IDR</strong>
+    </div>
+
+    <!-- MYR → IDR -->
+    <div>
+      <label class="block text-sm font-semibold text-gray-700 mb-2">MYR → IDR</label>
+      <div class="flex gap-3 items-center">
+        <div class="flex-1">
+          <label class="text-xs text-gray-400">MYR</label>
+          <input type="number" id="myrInput" step="0.01" value="1000" oninput="calcMyrToIdr()"
+            class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-right font-medium">
+        </div>
+        <span class="text-gray-400 text-lg mt-4">→</span>
+        <div class="flex-1">
+          <label class="text-xs text-gray-400">IDR</label>
+          <div id="idrResult" class="w-full mt-1 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-right font-bold text-indigo-700">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-gray-200"></div>
+
+    <!-- IDR → MYR -->
+    <div>
+      <label class="block text-sm font-semibold text-gray-700 mb-2">IDR → MYR</label>
+      <div class="flex gap-3 items-center">
+        <div class="flex-1">
+          <label class="text-xs text-gray-400">IDR</label>
+          <input type="number" id="idrInput" step="1" value="3600000" oninput="calcIdrToMyr()"
+            class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-right font-medium">
+        </div>
+        <span class="text-gray-400 text-lg mt-4">→</span>
+        <div class="flex-1">
+          <label class="text-xs text-gray-400">MYR</label>
+          <div id="myrResult" class="w-full mt-1 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-right font-bold text-emerald-700">—</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 text-center">Exchange rate can be changed in <a href="/settings" class="text-indigo-500 hover:underline">Settings</a></p>
+  </div>
+</div>
+
+<script>
+  const RATE = <%= myrToIdr %>;
+  function calcMyrToIdr() {
+    const myr = parseFloat(document.getElementById('myrInput').value) || 0;
+    document.getElementById('idrResult').textContent = 'IDR ' + Math.round(myr * RATE).toLocaleString('id-ID');
+  }
+  function calcIdrToMyr() {
+    const idr = parseFloat(document.getElementById('idrInput').value) || 0;
+    document.getElementById('myrResult').textContent = 'MYR ' + (idr / RATE).toLocaleString('en-MY', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  calcMyrToIdr();
+  calcIdrToMyr();
+</script>

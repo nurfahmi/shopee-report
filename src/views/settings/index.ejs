@@ -1,0 +1,55 @@
+<div class="max-w-2xl">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">Settings</h1>
+
+  <form method="POST" action="/settings" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">OpenAI API Key</label>
+      <input type="password" name="openai_api_key" value="<%= settings.openai_api_key || '' %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm font-mono"
+        placeholder="sk-...">
+      <p class="text-xs text-gray-400 mt-1">Used for AI OCR extraction from Shopee payout invoices</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Default Deduction % (Malaysian Admin)</label>
+      <input type="number" name="default_deduction_percent" step="0.01" min="0" max="100"
+        value="<%= settings.default_deduction_percent || '5.00' %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+      <p class="text-xs text-gray-400 mt-1">Can be overridden per payout period</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Default Business Profile</label>
+      <select name="default_business_profile_id"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white">
+        <% profiles.forEach(p => { %>
+          <option value="<%= p.id %>" <%= (settings.default_business_profile_id == p.id) ? 'selected' : '' %>><%= p.name %> <%= p.is_default ? '(default)' : '' %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="border-t border-gray-200 pt-4 mt-4">
+      <p class="text-sm font-semibold text-gray-700 mb-3">Exchange Rate</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">MYR → IDR Rate</label>
+          <input type="number" name="myr_to_idr_rate" step="0.01"
+            value="<%= settings.myr_to_idr_rate || '3600' %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+          <p class="text-xs text-gray-400 mt-1">1 MYR = ? IDR</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">IDR → MYR Rate</label>
+          <input type="number" name="idr_to_myr_rate" step="0.000001"
+            value="<%= settings.idr_to_myr_rate || '0.000278' %>"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+          <p class="text-xs text-gray-400 mt-1">1 IDR = ? MYR</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-2">
+      <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+        Save Settings
+      </button>
+    </div>
+  </form>
+</div>

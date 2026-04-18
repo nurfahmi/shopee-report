@@ -1,0 +1,250 @@
+const db = require('./database');
+const fs = require('fs');
+const path = require('path');
+
+async function syncDatabase() {
+  const mysql = require('mysql2/promise');
+
+  // First connect without database to create it if needed
+  const connection = await mysql.createConnection({
+    host:     process.env.DB_HOST || 'localhost',
+    port:     process.env.DB_PORT || 3306,
+    user:     process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || ''
+  });
+
+  const dbName = process.env.DB_NAME || 'ish_invoice';
+  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await connection.query(`USE \`${dbName}\``);
+
+  // Create all tables (IF NOT EXISTS = safe to run every time)
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      name          VARCHAR(100) NOT NULL,
+      email         VARCHAR(150) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      role          ENUM('superadmin','my_admin','malaysian_admin') NOT NULL DEFAULT 'my_admin',
+      is_active     TINYINT(1) NOT NULL DEFAULT 1,
+      created_by    INT NULL,
+      created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS settings (
+      \`key\`       VARCHAR(100) NOT NULL PRIMARY KEY,
+      \`value\`     TEXT NULL,
+      updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS business_profiles (
+      id                  INT AUTO_INCREMENT PRIMARY KEY,
+      name                VARCHAR(150) NOT NULL,
+      logo_path           VARCHAR(500) NULL,
+      address             TEXT NULL,
+      email               VARCHAR(150) NULL,
+      phone               VARCHAR(50) NULL,
+      bank_name           VARCHAR(150) NULL,
+      bank_account_number VARCHAR(100) NULL,
+      bank_account_name   VARCHAR(150) NULL,
+      is_default          TINYINT(1) NOT NULL DEFAULT 0,
+      created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS affiliate_accounts (
+      id             INT AUTO_INCREMENT PRIMARY KEY,
+      full_name      VARCHAR(200) NOT NULL,
+      bank_name      VARCHAR(150) NOT NULL,
+      account_number VARCHAR(100) NOT NULL,
+      phone          VARCHAR(50) NULL,
+      notes          TEXT NULL,
+      is_active      TINYINT(1) NOT NULL DEFAULT 1,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS payout_periods (
+      id                   INT AUTO_INCREMENT PRIMARY KEY,
+      period_number        VARCHAR(30) NOT NULL UNIQUE,
+      period_label         VARCHAR(150) NOT NULL,
+      payout_date          DATE NOT NULL,
+      shopee_invoice_path  VARCHAR(500) NULL,
+      deduction_percent    DECIMAL(5,2) NULL,
+      total_gross          DECIMAL(12,2) NOT NULL DEFAULT 0,
+      deduction_amount     DECIMAL(12,2) NOT NULL DEFAULT 0,
+      net_to_ish           DECIMAL(12,2) NOT NULL DEFAULT 0,
+      transfer_proof_path  VARCHAR(500) NULL,
+      transfer_date        DATE NULL,
+      status               ENUM('open','submitted','transferring','pending_confirmation','complete') NOT NULL DEFAULT 'open',
+      notes                TEXT NULL,
+      created_by           INT NOT NULL,
+      settled_by           INT NULL,
+      confirmed_by         INT NULL,
+      created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by)   REFERENCES users(id),
+      FOREIGN KEY (settled_by)   REFERENCES users(id),
+      FOREIGN KEY (confirmed_by) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS payout_entries (
+      id                   INT AUTO_INCREMENT PRIMARY KEY,
+      payout_period_id     INT NULL,
+      affiliate_account_id INT NULL,
+      extracted_name       VARCHAR(200) NULL,
+      invoice_file_path    VARCHAR(500) NULL,
+      invoice_date         DATE NULL,
+      period_description   VARCHAR(200) NULL,
+      payout_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
+      tax_amount           DECIMAL(12,2) NOT NULL DEFAULT 0,
+      payout_amount_idr    DECIMAL(15,2) NOT NULL DEFAULT 0,
+      payment_status       ENUM('pending','collected','transferred','confirmed') NOT NULL DEFAULT 'pending',
+      payment_time         DATETIME NULL,
+      collected_by         INT NULL,
+      notes                TEXT NULL,
+      sort_order           INT NOT NULL DEFAULT 0,
+      created_by           INT NULL,
+      created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (payout_period_id)     REFERENCES payout_periods(id) ON DELETE SET NULL,
+      FOREIGN KEY (affiliate_account_id) REFERENCES affiliate_accounts(id),
+      FOREIGN KEY (collected_by)         REFERENCES users(id),
+      FOREIGN KEY (created_by)           REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS payout_history (
+      id               INT AUTO_INCREMENT PRIMARY KEY,
+      payout_period_id INT NOT NULL,
+      payout_entry_id  INT NULL,
+      action           VARCHAR(100) NOT NULL,
+      details          TEXT NULL,
+      performed_by     INT NOT NULL,
+      created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (payout_period_id) REFERENCES payout_periods(id) ON DELETE CASCADE,
+      FOREIGN KEY (payout_entry_id)  REFERENCES payout_entries(id) ON DELETE SET NULL,
+      FOREIGN KEY (performed_by)     REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS clients (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      name       VARCHAR(150) NOT NULL,
+      company    VARCHAR(200) NULL,
+      email      VARCHAR(150) NULL,
+      phone      VARCHAR(50) NULL,
+      address    TEXT NULL,
+      country    VARCHAR(100) NULL DEFAULT 'Malaysia',
+      currency   VARCHAR(10) NOT NULL DEFAULT 'MYR',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS projects (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      client_id     INT NOT NULL,
+      project_name  VARCHAR(200) NOT NULL,
+      description   TEXT NULL,
+      scope_md_path VARCHAR(500) NULL,
+      status        ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active',
+      created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS invoices (
+      id                   INT AUTO_INCREMENT PRIMARY KEY,
+      project_id           INT NOT NULL,
+      business_profile_id  INT NOT NULL,
+      invoice_number       VARCHAR(30) NOT NULL UNIQUE,
+      issue_date           DATE NOT NULL,
+      due_date             DATE NULL,
+      payment_type         ENUM('full','milestone') NOT NULL DEFAULT 'full',
+      subtotal             DECIMAL(12,2) NOT NULL DEFAULT 0,
+      tax_percent          DECIMAL(5,2) NOT NULL DEFAULT 0,
+      tax_amount           DECIMAL(12,2) NOT NULL DEFAULT 0,
+      total                DECIMAL(12,2) NOT NULL DEFAULT 0,
+      amount_paid          DECIMAL(12,2) NOT NULL DEFAULT 0,
+      balance_due          DECIMAL(12,2) NOT NULL DEFAULT 0,
+      status               ENUM('draft','sent','partial','paid') NOT NULL DEFAULT 'draft',
+      notes                TEXT NULL,
+      created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (project_id)          REFERENCES projects(id),
+      FOREIGN KEY (business_profile_id) REFERENCES business_profiles(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS invoice_items (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id   INT NOT NULL,
+      phase_label  VARCHAR(200) NULL,
+      description  TEXT NOT NULL,
+      quantity     DECIMAL(10,2) NOT NULL DEFAULT 1,
+      unit_price   DECIMAL(12,2) NOT NULL DEFAULT 0,
+      amount       DECIMAL(12,2) NOT NULL DEFAULT 0,
+      sort_order   INT NOT NULL DEFAULT 0,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS invoice_milestones (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      label      VARCHAR(200) NOT NULL,
+      percent    DECIMAL(5,2) NOT NULL DEFAULT 0,
+      amount     DECIMAL(12,2) NOT NULL DEFAULT 0,
+      due_date   DATE NULL,
+      status     ENUM('pending','invoiced','paid') NOT NULL DEFAULT 'pending',
+      paid_at    DATETIME NULL,
+      FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS payments (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id   INT NOT NULL,
+      milestone_id INT NULL,
+      amount       DECIMAL(12,2) NOT NULL,
+      payment_date DATE NOT NULL,
+      method       VARCHAR(100) NULL,
+      reference    VARCHAR(200) NULL,
+      notes        TEXT NULL,
+      created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (invoice_id)   REFERENCES invoices(id) ON DELETE CASCADE,
+      FOREIGN KEY (milestone_id) REFERENCES invoice_milestones(id)
+    )`
+  ];
+
+  for (const sql of tables) {
+    await connection.query(sql);
+  }
+
+  // ── Migrations: add columns if missing (MySQL 5.7+ compatible) ──
+  async function addColumnIfMissing(conn, table, column, definition) {
+    const [rows] = await conn.query(
+      `SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [dbName, table, column]
+    );
+    if (rows[0].c === 0) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    }
+  }
+
+  await addColumnIfMissing(connection, 'payout_entries', 'invoice_file_path', 'VARCHAR(500) NULL AFTER extracted_name');
+  await addColumnIfMissing(connection, 'payout_entries', 'invoice_date', 'DATE NULL AFTER invoice_file_path');
+  await addColumnIfMissing(connection, 'payout_entries', 'period_description', 'VARCHAR(200) NULL AFTER invoice_date');
+  await addColumnIfMissing(connection, 'payout_entries', 'tax_amount', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER payout_amount');
+  await addColumnIfMissing(connection, 'payout_entries', 'payout_amount_idr', 'DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER tax_amount');
+  await addColumnIfMissing(connection, 'payout_entries', 'created_by', 'INT NULL AFTER sort_order');
+
+  // Make payout_period_id nullable (was NOT NULL in old schema)
+  try { await connection.query('ALTER TABLE payout_entries MODIFY COLUMN payout_period_id INT NULL'); } catch(e) {}
+
+  // Seed default settings if empty
+  const [settingsRows] = await connection.query('SELECT COUNT(*) AS c FROM settings');
+  if (settingsRows[0].c === 0) {
+    await connection.query(`INSERT IGNORE INTO settings (\`key\`, \`value\`) VALUES
+      ('openai_api_key', ''),
+      ('default_deduction_percent', '5.00'),
+      ('default_business_profile_id', '1'),
+      ('myr_to_idr_rate', '3600'),
+      ('idr_to_myr_rate', '0.000278')`);
+  }
+
+  // Seed default business profile if empty
+  const [bpRows] = await connection.query('SELECT COUNT(*) AS c FROM business_profiles');
+  if (bpRows[0].c === 0) {
+    await connection.query(`INSERT INTO business_profiles (name, address, email, is_default)
+      VALUES ('Indosofthouse', 'Malaysia / Indonesia', 'admin@indosofthouse.com', 1)`);
+  }
+
+  await connection.end();
+  console.log('✓ Database synced (all tables ready)');
+}
+
+module.exports = { syncDatabase };

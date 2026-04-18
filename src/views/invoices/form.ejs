@@ -1,0 +1,234 @@
+<div class="max-w-4xl">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6"><%= editing ? 'Edit Invoice ' + invoice.invoice_number : 'New Invoice' %></h1>
+
+  <!-- MD Import -->
+  <% if (!editing) { %>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+    <p class="text-sm font-semibold text-gray-700 mb-3">Import from MD File (optional)</p>
+    <div class="flex items-center gap-3">
+      <input type="file" id="mdFile" accept=".md,.txt"
+        class="text-sm file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700">
+      <button type="button" onclick="importMD()" id="importBtn"
+        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg text-sm transition-colors">Parse MD</button>
+    </div>
+    <p id="mdStatus" class="text-xs text-gray-400 mt-2"></p>
+  </div>
+  <% } %>
+
+  <form method="POST" action="<%= editing ? `/invoices/${invoice.id}/edit` : '/invoices/create' %>" id="invoiceForm"
+    class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+        <select name="project_id" id="projectId" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+          <option value="">Select project...</option>
+          <% if (typeof clients !== 'undefined') { clients.forEach(c => { %><option disabled class="font-semibold">── <%= c.name %> ──</option><% }) } %>
+        </select>
+        <% if (project) { %>
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const sel = document.getElementById('projectId');
+            const opt = document.createElement('option');
+            opt.value = '<%= project.id %>';
+            opt.textContent = '<%= project.project_name %> (<%= project.client_name %>)';
+            opt.selected = true;
+            sel.appendChild(opt);
+          });
+        </script>
+        <% } %>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Business Profile (Sender)</label>
+        <select name="business_profile_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+          <% profiles.forEach(p => { %>
+            <option value="<%= p.id %>" <%= (p.id == (editing ? invoice.business_profile_id : defaultProfileId)) ? 'selected' : '' %>><%= p.name %> <%= p.is_default ? '(default)' : '' %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+        <input type="date" name="issue_date" value="<%= editing ? (invoice.issue_date ? new Date(invoice.issue_date).toISOString().split('T')[0] : '') : new Date().toISOString().split('T')[0] %>" required
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+        <input type="date" name="due_date" value="<%= editing && invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '' %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tax %</label>
+        <input type="number" name="tax_percent" step="0.01" min="0" value="<%= editing ? invoice.tax_percent : 0 %>"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      </div>
+    </div>
+
+    <!-- Payment Type -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Payment Type</label>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="payment_type" value="full" <%= (!editing || invoice.payment_type === 'full') ? 'checked' : '' %>
+            class="text-indigo-600 focus:ring-indigo-500" onchange="toggleMilestones()">
+          <span class="text-sm text-gray-700">Full Payment</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="payment_type" value="milestone" <%= (editing && invoice.payment_type === 'milestone') ? 'checked' : '' %>
+            class="text-indigo-600 focus:ring-indigo-500" onchange="toggleMilestones()">
+          <span class="text-sm text-gray-700">Milestone / Partial</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Line Items -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <label class="text-sm font-semibold text-gray-700">Line Items</label>
+        <button type="button" onclick="addItem()" class="text-sm text-indigo-600 hover:text-indigo-500 font-medium">+ Add Item</button>
+      </div>
+      <div id="itemsContainer" class="space-y-2">
+        <% const existingItems = editing ? items : []; %>
+        <% if (existingItems.length === 0) { existingItems.push({phase_label:'',description:'',quantity:1,unit_price:0,amount:0}); } %>
+        <% existingItems.forEach((it, i) => { %>
+          <div class="flex gap-2 items-start item-row">
+            <input type="text" name="items_phase" value="<%= it.phase_label || '' %>" placeholder="Phase"
+              class="w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <input type="text" name="items_description" value="<%= it.description || '' %>" placeholder="Description" required
+              class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <input type="number" name="items_qty" value="<%= it.quantity || 1 %>" step="0.01" min="0" placeholder="Qty"
+              class="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+            <input type="number" name="items_price" value="<%= it.unit_price || 0 %>" step="0.01" placeholder="Price"
+              class="w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+            <input type="number" name="items_amount" value="<%= it.amount || 0 %>" step="0.01" readonly
+              class="w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
+            <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <div id="milestonesSection" style="display:none;">
+      <div class="flex items-center justify-between mb-2">
+        <label class="text-sm font-semibold text-gray-700">Payment Milestones</label>
+        <button type="button" onclick="addMilestone()" class="text-sm text-indigo-600 hover:text-indigo-500 font-medium">+ Add Milestone</button>
+      </div>
+      <div id="milestonesContainer" class="space-y-2">
+        <% const existingMs = editing ? milestones : []; %>
+        <% existingMs.forEach((m, i) => { %>
+          <div class="flex gap-2 items-start ms-row">
+            <input type="text" name="milestone_label" value="<%= m.label %>" placeholder="e.g. Upfront 50%"
+              class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <input type="number" name="milestone_percent" value="<%= m.percent %>" step="0.01" placeholder="%"
+              class="w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <input type="number" name="milestone_amount" value="<%= m.amount %>" step="0.01" placeholder="Amount"
+              class="w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <input type="date" name="milestone_due" value="<%= m.due_date ? new Date(m.due_date).toISOString().split('T')[0] : '' %>"
+              class="w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+      <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"><%= editing ? (invoice.notes || '') : '' %></textarea>
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+        <%= editing ? 'Update' : 'Create' %> Invoice
+      </button>
+      <a href="/invoices" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  function calcRow(el) {
+    const row = el.closest('.item-row');
+    const qty   = parseFloat(row.querySelector('[name="items_qty"]').value) || 0;
+    const price = parseFloat(row.querySelector('[name="items_price"]').value) || 0;
+    row.querySelector('[name="items_amount"]').value = (qty * price).toFixed(2);
+  }
+
+  function addItem() {
+    const html = `<div class="flex gap-2 items-start item-row">
+      <input type="text" name="items_phase" placeholder="Phase" class="w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="text" name="items_description" placeholder="Description" required class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="items_qty" value="1" step="0.01" class="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+      <input type="number" name="items_price" value="0" step="0.01" class="w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+      <input type="number" name="items_amount" value="0" step="0.01" readonly class="w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
+      <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>`;
+    document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
+  }
+
+  function addMilestone() {
+    const html = `<div class="flex gap-2 items-start ms-row">
+      <input type="text" name="milestone_label" placeholder="e.g. Upfront 50%" class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="milestone_percent" step="0.01" placeholder="%" class="w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="milestone_amount" step="0.01" placeholder="Amount" class="w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="date" name="milestone_due" class="w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>`;
+    document.getElementById('milestonesContainer').insertAdjacentHTML('beforeend', html);
+  }
+
+  function toggleMilestones() {
+    const ms = document.querySelector('input[name="payment_type"]:checked').value === 'milestone';
+    document.getElementById('milestonesSection').style.display = ms ? 'block' : 'none';
+  }
+  toggleMilestones();
+
+  async function importMD() {
+    const fileInput = document.getElementById('mdFile');
+    if (!fileInput.files[0]) return;
+    const formData = new FormData();
+    formData.append('md_file', fileInput.files[0]);
+    document.getElementById('mdStatus').textContent = 'Parsing...';
+    try {
+      const res = await fetch('/invoices/parse-md', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      const d = json.data;
+      // Clear items and fill
+      document.getElementById('itemsContainer').innerHTML = '';
+      d.items_flat.forEach(it => {
+        addItem();
+        const rows = document.querySelectorAll('.item-row');
+        const row = rows[rows.length - 1];
+        row.querySelector('[name="items_phase"]').value = it.phase_label || '';
+        row.querySelector('[name="items_description"]').value = it.description;
+        row.querySelector('[name="items_price"]').value = it.amount;
+        row.querySelector('[name="items_amount"]').value = it.amount;
+      });
+      // Payment terms → milestones
+      if (d.payment_terms.length > 0) {
+        document.querySelector('input[name="payment_type"][value="milestone"]').checked = true;
+        toggleMilestones();
+        document.getElementById('milestonesContainer').innerHTML = '';
+        d.payment_terms.forEach(pt => {
+          addMilestone();
+          const rows = document.querySelectorAll('.ms-row');
+          const row = rows[rows.length - 1];
+          row.querySelector('[name="milestone_label"]').value = pt.label;
+          row.querySelector('[name="milestone_percent"]').value = pt.percent;
+          row.querySelector('[name="milestone_amount"]').value = pt.amount;
+        });
+      }
+      document.getElementById('mdStatus').textContent = `✓ Parsed: ${d.project_name} — ${d.items_flat.length} items, MYR ${d.total}`;
+    } catch(err) {
+      document.getElementById('mdStatus').textContent = `✗ Error: ${err.message}`;
+    }
+  }
+</script>

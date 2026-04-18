@@ -1,0 +1,35 @@
+<div class="max-w-xl">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">New Payout Period</h1>
+  <form method="POST" action="/shopee/payouts/create" enctype="multipart/form-data"
+    class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Period Label</label>
+      <input type="text" name="period_label" required placeholder="e.g. March 2026 – Week 1-2"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Payout Date</label>
+      <input type="date" name="payout_date" required value="<%= new Date().toISOString().split('T')[0] %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Deduction % (commission to MY admin)</label>
+      <input type="number" name="deduction_percent" step="0.01" value="<%= data.deduction_percent || 5 %>"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
+    </div>
+
+    <div class="border-t border-gray-200 pt-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-2">Shopee Payout Invoices (one PDF per affiliate)</label>
+      <p class="text-xs text-gray-400 mb-2">Upload all the Self-Billed E-Invoice PDFs from Shopee. Each file = one affiliate. AI will extract the data automatically.</p>
+      <input type="file" name="shopee_invoices" multiple accept=".pdf,image/jpeg,image/png,image/webp"
+        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700">
+    </div>
+
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+        Create & Extract
+      </button>
+      <a href="/shopee/payouts" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors">Cancel</a>
+    </div>
+  </form>
+</div>

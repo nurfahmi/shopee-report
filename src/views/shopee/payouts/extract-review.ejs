@@ -1,0 +1,92 @@
+<div class="max-w-5xl">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/shopee/payouts/<%= period.id %>" class="text-gray-400 hover:text-gray-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Review Extracted Data</h1>
+      <p class="text-gray-500 text-sm"><%= period.period_label %> — Rate: 1 MYR = <%= rate.toLocaleString() %> IDR</p>
+    </div>
+  </div>
+
+  <% if (ocrErrors.length > 0) { %>
+    <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+      <p class="font-semibold mb-1">Extraction errors:</p>
+      <% ocrErrors.forEach(e => { %><p>• <%= e %></p><% }) %>
+    </div>
+  <% } %>
+
+  <% if (extracted.length === 0) { %>
+    <div class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg text-sm">
+      No data could be extracted. Check your files and try again.
+    </div>
+  <% } else { %>
+
+  <form method="POST" action="/shopee/payouts/<%= period.id %>/confirm">
+    <div class="space-y-4 mb-6">
+      <% extracted.forEach((e, i) => { %>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <span class="text-xs text-gray-400">Invoice #<%= i+1 %></span>
+              <h3 class="text-lg font-bold text-gray-800"><%= e.extracted_name %></h3>
+            </div>
+            <div class="text-right">
+              <p class="text-lg font-bold text-gray-800">MYR <%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+              <p class="text-sm text-indigo-600 font-medium">IDR <%= parseInt(e.payout_amount_idr).toLocaleString('id-ID') %></p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="text-xs text-gray-500">Account Holder Name</label>
+              <input type="text" name="entries[<%= i %>][extracted_name]" value="<%= e.extracted_name %>"
+                class="w-full mt-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Link to Account</label>
+              <select name="entries[<%= i %>][affiliate_account_id]"
+                class="w-full mt-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+                <option value="">— Unlinked —</option>
+                <% affiliates.forEach(a => { %>
+                  <option value="<%= a.id %>" <%= a.id == e.affiliate_account_id ? 'selected' : '' %>><%= a.full_name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Net Payable (MYR)</label>
+              <input type="number" name="entries[<%= i %>][payout_amount]" step="0.01" value="<%= e.payout_amount %>"
+                class="w-full mt-1 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Tax (MYR)</label>
+              <input type="number" name="entries[<%= i %>][tax_amount]" step="0.01" value="<%= e.tax_amount %>"
+                class="w-full mt-1 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mt-2">
+            <div>
+              <label class="text-xs text-gray-500">Invoice Date</label>
+              <input type="text" name="entries[<%= i %>][invoice_date]" value="<%= e.invoice_date %>" placeholder="DD/MM/YYYY"
+                class="w-full mt-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            </div>
+            <div class="flex items-end">
+              <% if (e.invoice_file_path) { %>
+                <a href="<%= e.invoice_file_path %>" target="_blank" class="text-xs text-indigo-500 hover:underline">View uploaded file</a>
+              <% } %>
+            </div>
+          </div>
+          <input type="hidden" name="entries[<%= i %>][invoice_file_path]" value="<%= e.invoice_file_path %>">
+        </div>
+      <% }) %>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-sm transition-colors">
+        ✓ Confirm & Save (<%= extracted.length %> entries)
+      </button>
+      <a href="/shopee/payouts/<%= period.id %>" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg text-sm transition-colors">Cancel</a>
+    </div>
+  </form>
+  <% } %>
+</div>

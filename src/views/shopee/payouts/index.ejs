@@ -1,0 +1,144 @@
+<div class="max-w-6xl">
+  <h1 class="text-2xl font-bold text-gray-800 mb-1">Shopee Payouts</h1>
+  <p class="text-gray-500 text-sm mb-6">Track affiliate payouts from Shopee. Upload invoices or add manually.</p>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs font-medium text-gray-500">Total Entries</p>
+      <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs font-medium text-gray-500">Total (MYR)</p>
+      <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xs text-indigo-500 font-medium">IDR <%= Math.round(parseFloat(stats.total_idr)).toLocaleString('id-ID') %></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs font-medium text-gray-500">Pending Collection</p>
+      <p class="text-2xl font-bold text-amber-600 mt-1"><%= parseInt(stats.pending_count) %></p>
+      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.pending_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs font-medium text-gray-500">Collected</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= parseInt(stats.collected_count) %></p>
+      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.collected_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    </div>
+  </div>
+
+  <!-- Input Section -->
+  <% if (isISHAdmin) { %>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <!-- Upload PDFs -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <p class="text-sm font-semibold text-gray-700 mb-1">Upload Shopee Invoices</p>
+      <p class="text-xs text-gray-400 mb-3">Upload PDF invoices. Auto-extracts & auto-links to affiliate accounts.</p>
+      <form method="POST" action="/shopee/payouts/upload" enctype="multipart/form-data" class="space-y-3">
+        <input type="file" name="shopee_invoices" multiple accept=".pdf"
+          class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 file:rounded-lg file:cursor-pointer">
+        <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+          Upload & Extract
+        </button>
+      </form>
+    </div>
+
+    <!-- Manual Add -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <p class="text-sm font-semibold text-gray-700 mb-1">Add Manually</p>
+      <p class="text-xs text-gray-400 mb-3">Select account holder and enter payout details.</p>
+      <form method="POST" action="/shopee/payouts/add" class="space-y-2">
+        <select name="affiliate_account_id" required
+          class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+          <option value="">— Select Account Holder —</option>
+          <% affiliates.forEach(a => { %>
+            <option value="<%= a.id %>"><%= a.full_name %> (<%= a.bank_name %> - <%= a.account_number %>)</option>
+          <% }) %>
+        </select>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="number" name="payout_amount" step="0.01" required placeholder="MYR amount"
+            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+          <input type="number" name="tax_amount" step="0.01" value="0" placeholder="Tax"
+            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+          <input type="date" name="invoice_date"
+            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+        </div>
+        <input type="text" name="period_description" placeholder="Period (e.g. 05-03-2026 to 15-04-2026)"
+          class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+        <button type="submit" class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm transition-colors">
+          Add Entry
+        </button>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Entries Table -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+      <p class="text-sm font-semibold text-gray-700">All Payouts</p>
+      <p class="text-xs text-gray-400">1 MYR = <%= rate.toLocaleString() %> IDR</p>
+    </div>
+    <% if (!entries.length) { %>
+      <div class="px-5 py-12 text-center text-gray-400">
+        <p class="text-lg mb-1">No payouts yet</p>
+        <p class="text-sm">Upload Shopee invoice PDFs or add entries manually above.</p>
+      </div>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Period</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Tax</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">MYR</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">IDR</th>
+              <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% entries.forEach(e => { %>
+              <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
+                <td class="px-4 py-3">
+                  <p class="font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></p>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <% if (e.affiliate_name) { %>
+                      <span class="text-xs text-emerald-500">✓ linked</span>
+                    <% } else { %>
+                      <span class="text-xs text-amber-500">unlinked</span>
+                    <% } %>
+                    <% if (e.invoice_file_path) { %>
+                      <span class="text-xs text-indigo-500">📄 pdf</span>
+                    <% } %>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
+                <td class="px-4 py-3 text-gray-500 text-xs"><%= e.period_description || '-' %></td>
+                <td class="px-4 py-3 text-right text-gray-500"><%= parseFloat(e.tax_amount || 0).toFixed(2) %></td>
+                <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+                <td class="px-4 py-3 text-right text-indigo-600 font-medium"><%= parseInt(e.payout_amount_idr || 0).toLocaleString('id-ID') %></td>
+                <td class="px-4 py-3 text-center">
+                  <% const colors = {pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-blue-100 text-blue-700',confirmed:'bg-gray-100 text-gray-600'}; %>
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+                  <% if (e.payment_status === 'pending') { %>
+                    <form method="POST" action="/shopee/payouts/<%= e.id %>/collect" class="inline">
+                      <button class="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium">Collect</button>
+                    </form>
+                  <% } %>
+                  <% if (isISHAdmin && e.payment_status === 'pending') { %>
+                    <form method="POST" action="/shopee/payouts/<%= e.id %>/delete" class="inline ml-1" onsubmit="return confirm('Delete?')">
+                      <button class="text-xs px-2 py-1 text-red-400 hover:text-red-600">✕</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
