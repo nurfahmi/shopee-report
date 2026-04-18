@@ -108,6 +108,10 @@ async function start() {
     await db.query('SELECT 1');
     console.log('✓ Database pool ready');
 
+    // Start auto exchange rate refresh
+    const { startAutoRefresh } = require('./src/services/rateService');
+    startAutoRefresh();
+
     app.listen(PORT, () => {
       console.log(`✓ Shopee Report running on http://localhost:${PORT}`);
     });
