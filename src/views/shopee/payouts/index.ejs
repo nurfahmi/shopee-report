@@ -133,11 +133,11 @@
                 if (e.payment_status === 'processing' && (role === 'malaysia_admin' || role === 'superadmin')) {
                   nextAction = { status: 'collected', label: 'Collect', color: 'bg-amber-600 hover:bg-amber-500' };
                 } else if (e.payment_status === 'collected' && (role === 'malaysia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'transferring', label: 'Transfer', color: 'bg-indigo-600 hover:bg-indigo-500' };
+                  nextAction = { status: 'transferring', label: 'Transfer', color: 'bg-indigo-600 hover:bg-indigo-500', needsProof: true };
                 } else if (e.payment_status === 'transferring' && (role === 'indonesia_admin' || role === 'superadmin')) {
                   nextAction = { status: 'received', label: 'Received', color: 'bg-purple-600 hover:bg-purple-500' };
                 } else if (e.payment_status === 'received' && (role === 'indonesia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'distributed', label: 'Distributed', color: 'bg-orange-600 hover:bg-orange-500' };
+                  nextAction = { status: 'distributed', label: 'Distributed', color: 'bg-orange-600 hover:bg-orange-500', needsProof: true };
                 } else if (e.payment_status === 'distributed' && (role === 'studio' || role === 'superadmin')) {
                   nextAction = { status: 'completed', label: 'Confirm', color: 'bg-emerald-600 hover:bg-emerald-500' };
                 }
@@ -166,11 +166,13 @@
                   <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                  <% if (nextAction) { %>
+                  <% if (nextAction && !nextAction.needsProof) { %>
                     <form method="POST" action="/shopee/payouts/<%= e.id %>/status" class="inline">
                       <input type="hidden" name="status" value="<%= nextAction.status %>">
                       <button class="text-xs px-2.5 py-1 <%= nextAction.color %> text-white rounded font-medium"><%= nextAction.label %></button>
                     </form>
+                  <% } else if (nextAction && nextAction.needsProof) { %>
+                    <a href="/shopee/payouts/<%= e.id %>" class="text-xs px-2.5 py-1 <%= nextAction.color %> text-white rounded font-medium inline-block"><%= nextAction.label %> 📎</a>
                   <% } %>
                   <% if (isISHAdmin && e.payment_status === 'processing') { %>
                     <form method="POST" action="/shopee/payouts/<%= e.id %>/delete" class="inline ml-1" onsubmit="return confirm('Delete?')">

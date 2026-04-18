@@ -39,10 +39,16 @@ const logoUpload = multer({
   fileFilter: fileFilter(['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'])
 });
 
+const paymentProofUpload = multer({
+  storage: makeStorage('payment-proofs'),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: fileFilter(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+});
+
 const mdUpload = multer({
   storage: makeStorage('md-scopes'),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: fileFilter(['text/plain', 'text/markdown', 'application/octet-stream'])
 });
 
-module.exports = { shopeeInvoiceUpload, transferProofUpload, logoUpload, mdUpload };
+module.exports = { shopeeInvoiceUpload, transferProofUpload, paymentProofUpload, logoUpload, mdUpload };

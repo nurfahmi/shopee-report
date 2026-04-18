@@ -103,9 +103,11 @@ async function syncDatabase() {
       tax_amount           DECIMAL(12,2) NOT NULL DEFAULT 0,
       payout_amount_idr    DECIMAL(15,2) NOT NULL DEFAULT 0,
       payment_status       ENUM('processing','collected','transferring','received','distributed','completed') NOT NULL DEFAULT 'processing',
-      payment_time         DATETIME NULL,
-      collected_by         INT NULL,
-      notes                TEXT NULL,
+      payment_time             DATETIME NULL,
+      collected_by             INT NULL,
+      transfer_proof_path      VARCHAR(500) NULL,
+      distribution_proof_path  VARCHAR(500) NULL,
+      notes                    TEXT NULL,
       sort_order           INT NOT NULL DEFAULT 0,
       created_by           INT NULL,
       created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -262,6 +264,14 @@ async function syncDatabase() {
     await connection.query(`UPDATE payout_entries SET payment_status='processing' WHERE payment_status='pending'`);
     await connection.query(`UPDATE payout_entries SET payment_status='transferring' WHERE payment_status='transferred'`);
     await connection.query(`UPDATE payout_entries SET payment_status='completed' WHERE payment_status='confirmed'`);
+  } catch(e) {}
+
+  // Add proof columns
+  try {
+    await connection.query(`ALTER TABLE payout_entries ADD COLUMN transfer_proof_path VARCHAR(500) NULL AFTER collected_by`);
+  } catch(e) {}
+  try {
+    await connection.query(`ALTER TABLE payout_entries ADD COLUMN distribution_proof_path VARCHAR(500) NULL AFTER transfer_proof_path`);
   } catch(e) {}
 
   // Seed default settings if empty

@@ -49,9 +49,13 @@ const PayoutEntry = {
     return rows[0] || null;
   },
 
-  async updateStatus(id, status, userId) {
+  async updateStatus(id, status, userId, proofPath = null) {
     if (status === 'collected') {
       await db.query(`UPDATE payout_entries SET payment_status='collected', payment_time=NOW(), collected_by=? WHERE id=?`, [userId, id]);
+    } else if (status === 'transferring' && proofPath) {
+      await db.query(`UPDATE payout_entries SET payment_status='transferring', transfer_proof_path=? WHERE id=?`, [proofPath, id]);
+    } else if (status === 'distributed' && proofPath) {
+      await db.query(`UPDATE payout_entries SET payment_status='distributed', distribution_proof_path=? WHERE id=?`, [proofPath, id]);
     } else {
       await db.query(`UPDATE payout_entries SET payment_status=? WHERE id=?`, [status, id]);
     }

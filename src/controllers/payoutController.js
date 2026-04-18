@@ -173,13 +173,28 @@ const payoutController = {
       return res.redirect('/shopee/payouts');
     }
 
-    await PayoutEntry.updateStatus(id, status, user.id);
+    // Proof required for transferring and distributed
+    let proofPath = null;
+    if ((status === 'transferring' || status === 'distributed') && req.file) {
+      proofPath = `/uploads/proofs/${req.file.filename}`;
+    }
+
+    if (status === 'transferring' && !proofPath) {
+      req.flash('error', 'Transfer proof is required when marking as transferring.');
+      return res.redirect('/shopee/payouts');
+    }
+    if (status === 'distributed' && !proofPath) {
+      req.flash('error', 'Payment proof is required when distributing to studio.');
+      return res.redirect('/shopee/payouts');
+    }
+
+    await PayoutEntry.updateStatus(id, status, user.id, proofPath);
 
     const labels = {
       collected: 'Marked as collected',
-      transferring: 'Marked as transferring to Indonesia',
+      transferring: 'Marked as transferring to Indonesia (proof attached)',
       received: 'Confirmed money received in Indonesia',
-      distributed: 'Money distributed to studio',
+      distributed: 'Money distributed to studio (proof attached)',
       completed: 'Confirmed received — completed!'
     };
 
