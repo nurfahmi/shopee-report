@@ -31,7 +31,8 @@
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Total (MYR)</p>
     <p class="text-3xl font-bold text-gray-800 mt-2"><%= totalMYR.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-gray-400 mt-1">Studio Net: MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    <p class="text-xs text-indigo-500 font-medium mt-1">~IDR <%= Math.round(totalMYR * rate).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-gray-400">Studio Net: MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Processing</p>
@@ -69,7 +70,8 @@
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Transfer Amount</p>
     <p class="text-2xl font-bold text-indigo-700 mt-2">MYR <%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-gray-400 mt-1">After deductions</p>
+    <p class="text-xs text-indigo-500 font-medium mt-1">~IDR <%= Math.round(afterMyAdmin * rate).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-gray-400">After deductions</p>
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Transferred</p>
@@ -94,7 +96,8 @@
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Your Earnings</p>
     <p class="text-2xl font-bold text-emerald-700 mt-2">MYR <%= idEarnings.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-gray-400 mt-1">From all invoices</p>
+    <p class="text-xs text-emerald-500 font-medium mt-1">~IDR <%= Math.round(idEarnings * rate).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-gray-400">From all invoices</p>
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Distributed</p>
@@ -114,7 +117,8 @@
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Estimated Net</p>
     <p class="text-2xl font-bold text-emerald-700 mt-2">~MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-gray-400 mt-1">After all deductions</p>
+    <p class="text-xs text-emerald-500 font-medium mt-1">~IDR <%= Math.round(studioNet * rate).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-gray-400">After all deductions</p>
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">To Confirm</p>
