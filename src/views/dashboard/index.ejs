@@ -22,7 +22,8 @@
       </span>
     </div>
     <p class="text-3xl font-bold text-gray-800 mt-3"><%= parseFloat(payoutStats.total_myr).toLocaleString('en-MY', {minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-indigo-500 font-medium mt-1">IDR <%= Math.round(parseFloat(payoutStats.total_idr)).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-indigo-500 font-medium mt-1">~IDR <%= Math.round(parseFloat(payoutStats.total_idr)).toLocaleString('id-ID') %></p>
+    <p class="text-xs text-gray-400">Estimated — actual may differ due to transfer fees</p>
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">

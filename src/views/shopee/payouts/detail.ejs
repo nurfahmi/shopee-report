@@ -62,11 +62,11 @@
             <p class="text-2xl font-bold text-gray-500"><%= parseFloat(entry.tax_amount || 0).toFixed(2) %></p>
           </div>
           <div>
-            <p class="text-xs font-medium text-gray-500">Amount (IDR)</p>
-            <p class="text-2xl font-bold text-indigo-600"><%= parseInt(entry.payout_amount_idr || 0).toLocaleString('id-ID') %></p>
+            <p class="text-xs font-medium text-gray-500">Est. Amount (IDR)</p>
+            <p class="text-2xl font-bold text-indigo-600">~<%= parseInt(entry.payout_amount_idr || 0).toLocaleString('id-ID') %></p>
           </div>
         </div>
-        <p class="text-xs text-gray-400 mt-1">Rate: 1 MYR = <%= rate.toLocaleString() %> IDR</p>
+        <p class="text-xs text-gray-400 mt-1">Rate: 1 MYR = <%= rate.toLocaleString() %> IDR · Estimated — actual may differ due to transfer fees</p>
       </div>
 
       <div class="border-t border-gray-200 pt-4">
