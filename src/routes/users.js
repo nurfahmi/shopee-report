@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const { requireAuth, requireSuperAdmin } = require('../middleware/auth');
+const { requireAuth, requireISHAdmin } = require('../middleware/auth');
 
-router.use(requireAuth, requireSuperAdmin);
+router.use(requireAuth, requireISHAdmin);
 
 router.get('/', userController.index);
 router.get('/create', userController.getCreate);
