@@ -1,55 +1,63 @@
-<div class="flex items-center justify-between mb-6">
-  <div>
-    <h1 class="text-2xl font-bold text-gray-800">Affiliate Accounts</h1>
-    <p class="text-gray-500 text-sm mt-1">Bank account holders receiving Shopee payouts</p>
+<div class="max-w-5xl">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Account Details</h1>
+      <p class="text-gray-500 text-sm mt-1">Shopee affiliate bank accounts receiving payouts</p>
+    </div>
+    <% if (isISHAdmin) { %>
+      <a href="/shopee/affiliates/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Add Account
+      </a>
+    <% } %>
   </div>
-  <% if (isISHAdmin) { %>
-    <a href="/shopee/affiliates/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Add Affiliate
-    </a>
-  <% } %>
-</div>
 
-<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-  <table class="w-full text-sm">
-    <thead class="bg-gray-50 border-b border-gray-200">
-      <tr>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Full Name</th>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Bank</th>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Account No.</th>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Phone</th>
-        <th class="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
-        <% if (isISHAdmin) { %>
-          <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
-        <% } %>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-100">
-      <% if (affiliates.length === 0) { %>
-        <tr><td colspan="6" class="px-5 py-8 text-center text-gray-400">No affiliates registered yet.</td></tr>
-      <% } %>
-      <% affiliates.forEach(a => { %>
-        <tr class="hover:bg-gray-50 transition-colors">
-          <td class="px-5 py-3 font-medium text-gray-800"><%= a.full_name %></td>
-          <td class="px-5 py-3 text-gray-600"><%= a.bank_name %></td>
-          <td class="px-5 py-3 text-gray-600 font-mono text-xs"><%= a.account_number %></td>
-          <td class="px-5 py-3 text-gray-600"><%= a.phone || '-' %></td>
-          <td class="px-5 py-3 text-center">
-            <span class="px-2.5 py-1 rounded-full text-xs font-medium <%= a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' %>">
-              <%= a.is_active ? 'Active' : 'Inactive' %>
-            </span>
-          </td>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-5 py-3 font-semibold text-gray-600">Account Holder</th>
+          <th class="text-left px-5 py-3 font-semibold text-gray-600">Bank</th>
+          <th class="text-left px-5 py-3 font-semibold text-gray-600">Account No.</th>
+          <% if (user.role !== 'malaysia_admin') { %>
+            <th class="text-left px-5 py-3 font-semibold text-gray-600">Shopee ID</th>
+            <th class="text-left px-5 py-3 font-semibold text-gray-600">Phone</th>
+            <th class="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
+          <% } %>
           <% if (isISHAdmin) { %>
-            <td class="px-5 py-3 text-right space-x-2">
-              <a href="/shopee/affiliates/<%= a.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
-              <form method="POST" action="/shopee/affiliates/<%= a.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
-                <button type="submit" class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
-              </form>
-            </td>
+            <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
           <% } %>
         </tr>
-      <% }) %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% if (affiliates.length === 0) { %>
+          <tr><td colspan="7" class="px-5 py-8 text-center text-gray-400">No accounts registered yet.</td></tr>
+        <% } %>
+        <% affiliates.forEach(a => { %>
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-3 font-medium text-gray-800"><%= a.full_name %></td>
+            <td class="px-5 py-3 text-gray-600"><%= a.bank_name %></td>
+            <td class="px-5 py-3 text-gray-600 font-mono text-xs"><%= a.account_number %></td>
+            <% if (user.role !== 'malaysia_admin') { %>
+              <td class="px-5 py-3 text-gray-600"><%= a.shopee_id || '-' %></td>
+              <td class="px-5 py-3 text-gray-600"><%= a.phone || '-' %></td>
+              <td class="px-5 py-3 text-center">
+                <span class="px-2.5 py-1 rounded-full text-xs font-medium <%= a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' %>">
+                  <%= a.is_active ? 'Active' : 'Inactive' %>
+                </span>
+              </td>
+            <% } %>
+            <% if (isISHAdmin) { %>
+              <td class="px-5 py-3 text-right space-x-2">
+                <a href="/shopee/affiliates/<%= a.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
+                <form method="POST" action="/shopee/affiliates/<%= a.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
+                  <button type="submit" class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
+                </form>
+              </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </div>
