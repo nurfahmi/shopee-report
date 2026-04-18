@@ -36,7 +36,11 @@
         </div>
       <% } %>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <p class="text-xs font-medium text-gray-500">Invoice Number</p>
+          <p class="text-sm font-semibold text-gray-800 font-mono"><%= entry.invoice_number || '-' %></p>
+        </div>
         <div>
           <p class="text-xs font-medium text-gray-500">Invoice Date</p>
           <p class="text-sm font-semibold text-gray-800"><%= entry.invoice_date ? new Date(entry.invoice_date).toLocaleDateString('en-GB') : '-' %></p>

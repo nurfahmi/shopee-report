@@ -5,7 +5,7 @@ const path = require('path');
 /**
  * Extract payout data from Shopee Self-Billed E-Invoice PDF.
  * No AI needed — pure text parsing.
- * Returns: { supplier_name, invoice_date, tax_amount, net_payable, period_description }
+ * Returns: { supplier_name, invoice_number, invoice_date, tax_amount, net_payable, period_description }
  */
 async function extractPayoutFromFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -35,13 +35,17 @@ async function extractPayoutFromFile(filePath) {
   const taxMatch = normalized.match(/Tax\s*Amount\s*Total\s*Including[\s\S]*?Not\s*Applicable\s*[\d.]+%\s*([\d,]+\.\d{2})/);
   if (taxMatch) tax_amount = parseFloat(taxMatch[1].replace(/,/g, ''));
 
+  // Invoice Number
+  const invoiceMatch = normalized.match(/Invoice\s*No\.?\s*\/\s*Code\s*([A-Z0-9]+)/);
+  const invoice_number = invoiceMatch ? invoiceMatch[1] : null;
+
   // Period description (e.g. "05-03-2026 to 15-04-2026")
   const periodMatch = normalized.match(/(\d{2}-\d{2}-\d{4})\s*to\s*(\d{2}-\d{2}-\d{4})/);
   const period_description = periodMatch ? `${periodMatch[1]} to ${periodMatch[2]}` : null;
 
   if (!supplier_name) throw new Error('Could not extract supplier name. Is this a Shopee E-Invoice?');
 
-  return { supplier_name, invoice_date, tax_amount, net_payable, period_description };
+  return { supplier_name, invoice_number, invoice_date, tax_amount, net_payable, period_description };
 }
 
 async function extractMultiplePayouts(filePaths) {

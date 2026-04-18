@@ -215,7 +215,8 @@ async function syncDatabase() {
     }
   }
 
-  await addColumnIfMissing(connection, 'payout_entries', 'invoice_file_path', 'VARCHAR(500) NULL AFTER extracted_name');
+  await addColumnIfMissing(connection, 'payout_entries', 'invoice_number', 'VARCHAR(100) NULL AFTER extracted_name');
+  await addColumnIfMissing(connection, 'payout_entries', 'invoice_file_path', 'VARCHAR(500) NULL AFTER invoice_number');
   await addColumnIfMissing(connection, 'payout_entries', 'invoice_date', 'DATE NULL AFTER invoice_file_path');
   await addColumnIfMissing(connection, 'payout_entries', 'period_description', 'VARCHAR(200) NULL AFTER invoice_date');
   await addColumnIfMissing(connection, 'payout_entries', 'tax_amount', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER payout_amount');
@@ -224,6 +225,9 @@ async function syncDatabase() {
 
   // Make payout_period_id nullable (was NOT NULL in old schema)
   try { await connection.query('ALTER TABLE payout_entries MODIFY COLUMN payout_period_id INT NULL'); } catch(e) {}
+
+  // Unique index on invoice_number for duplicate prevention
+  try { await connection.query('CREATE UNIQUE INDEX idx_invoice_number ON payout_entries (invoice_number)'); } catch(e) {}
 
   // Seed default settings if empty
   const [settingsRows] = await connection.query('SELECT COUNT(*) AS c FROM settings');

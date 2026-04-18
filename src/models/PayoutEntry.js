@@ -24,13 +24,18 @@ const PayoutEntry = {
     return rows[0] || null;
   },
 
-  async create({ affiliate_account_id, extracted_name, invoice_file_path, invoice_date, period_description, payout_amount, tax_amount, payout_amount_idr, created_by }) {
+  async create({ affiliate_account_id, extracted_name, invoice_number, invoice_file_path, invoice_date, period_description, payout_amount, tax_amount, payout_amount_idr, created_by }) {
     const [result] = await db.query(
-      `INSERT INTO payout_entries (affiliate_account_id, extracted_name, invoice_file_path, invoice_date, period_description, payout_amount, tax_amount, payout_amount_idr, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [affiliate_account_id || null, extracted_name || null, invoice_file_path || null, invoice_date || null, period_description || null, payout_amount || 0, tax_amount || 0, payout_amount_idr || 0, created_by || null]
+      `INSERT INTO payout_entries (affiliate_account_id, extracted_name, invoice_number, invoice_file_path, invoice_date, period_description, payout_amount, tax_amount, payout_amount_idr, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [affiliate_account_id || null, extracted_name || null, invoice_number || null, invoice_file_path || null, invoice_date || null, period_description || null, payout_amount || 0, tax_amount || 0, payout_amount_idr || 0, created_by || null]
     );
     return result.insertId;
+  },
+
+  async findByInvoiceNumber(invoiceNumber) {
+    const [rows] = await db.query('SELECT id FROM payout_entries WHERE invoice_number = ? LIMIT 1', [invoiceNumber]);
+    return rows[0] || null;
   },
 
   async markCollected(id, collected_by) {

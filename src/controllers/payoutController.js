@@ -37,9 +37,16 @@ const payoutController = {
     let added = 0;
     let errors = [];
 
+    let skipped = 0;
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (r.error) { errors.push(`${r.file}: ${r.error}`); continue; }
+
+      // Duplicate check by invoice number
+      if (r.invoice_number) {
+        const existing = await PayoutEntry.findByInvoiceNumber(r.invoice_number);
+        if (existing) { skipped++; continue; }
+      }
 
       // Auto-link by name
       let affiliateId = null;
@@ -59,6 +66,7 @@ const payoutController = {
       await PayoutEntry.create({
         affiliate_account_id: affiliateId,
         extracted_name: r.supplier_name,
+        invoice_number: r.invoice_number || null,
         invoice_file_path: `/uploads/shopee-invoices/${files[i].filename}`,
         invoice_date: isoDate,
         period_description: r.period_description || null,
@@ -73,8 +81,13 @@ const payoutController = {
     if (errors.length) {
       req.flash('error', `${errors.length} file(s) failed: ${errors.join('; ')}`);
     }
+    if (skipped) {
+      req.flash('error', `${skipped} duplicate(s) skipped (invoice already exists).`);
+    }
     if (added) {
-      req.flash('success', `${added} payout(s) extracted and saved.${added > 0 ? ' Auto-linked to matching accounts.' : ''}`);
+      req.flash('success', `${added} payout(s) extracted and saved.`);
+    } else if (!errors.length && !skipped) {
+      req.flash('error', 'No valid invoices found.');
     }
     res.redirect('/shopee/payouts');
   },
