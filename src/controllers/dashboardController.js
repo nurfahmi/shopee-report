@@ -10,6 +10,14 @@ const dashboardController = {
       const studioId = user.role === 'studio' ? user.studio_id : null;
       const rate = parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
 
+      // Deductions
+      const allSettings = await Setting.getAll();
+      const deductions = {
+        general: parseFloat(allSettings.deduction_general_percent || 0),
+        myAdmin: parseFloat(allSettings.deduction_my_admin_percent || 0),
+        idAdmin: parseFloat(allSettings.deduction_id_admin_percent || 0),
+      };
+
       const payoutStats = await PayoutEntry.getStats({ studioId });
       const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
       const recentPayouts = await PayoutEntry.findAll({ limit: 10, studioId });
@@ -35,7 +43,7 @@ const dashboardController = {
 
       res.render('dashboard/index', {
         title: 'Dashboard — Shopee Report',
-        payoutStats, affiliates, recentPayouts, affiliateSummary, rate, user
+        payoutStats, affiliates, recentPayouts, affiliateSummary, rate, deductions, user
       });
     } catch (err) {
       console.error('Dashboard error:', err);
