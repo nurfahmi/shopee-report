@@ -102,7 +102,7 @@ async function syncDatabase() {
       payout_amount        DECIMAL(12,2) NOT NULL DEFAULT 0,
       tax_amount           DECIMAL(12,2) NOT NULL DEFAULT 0,
       payout_amount_idr    DECIMAL(15,2) NOT NULL DEFAULT 0,
-      payment_status       ENUM('pending','collected','transferred','confirmed') NOT NULL DEFAULT 'pending',
+      payment_status       ENUM('processing','pending','collected','transferred','confirmed') NOT NULL DEFAULT 'processing',
       payment_time         DATETIME NULL,
       collected_by         INT NULL,
       notes                TEXT NULL,
@@ -253,6 +253,11 @@ async function syncDatabase() {
   try {
     await connection.query(`UPDATE users SET role='indonesia_admin' WHERE role='my_admin'`);
     await connection.query(`UPDATE users SET role='malaysia_admin' WHERE role='malaysian_admin'`);
+  } catch(e) {}
+
+  // Add 'processing' to payment_status ENUM
+  try {
+    await connection.query(`ALTER TABLE payout_entries MODIFY COLUMN payment_status ENUM('processing','pending','collected','transferred','confirmed') NOT NULL DEFAULT 'processing'`);
   } catch(e) {}
 
   // Seed default settings if empty

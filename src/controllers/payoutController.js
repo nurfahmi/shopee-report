@@ -2,8 +2,6 @@ const PayoutEntry   = require('../models/PayoutEntry');
 const Affiliate     = require('../models/Affiliate');
 const Setting       = require('../models/Setting');
 const { extractMultiplePayouts } = require('../services/ocrService');
-const { renderPDF } = require('../services/pdfService');
-const fs = require('fs');
 
 async function getRate() {
   return parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
@@ -147,10 +145,15 @@ const payoutController = {
     });
   },
 
-  // ── Mark collected ─────────────────────────────────────────────
+  // ── Mark collected (Malaysia admin only) ────────────────────────
   async postMarkCollected(req, res) {
+    const user = req.session.user;
+    if (user.role !== 'malaysia_admin' && user.role !== 'superadmin') {
+      req.flash('error', 'Only Malaysia Admin can update payout status.');
+      return res.redirect('/shopee/payouts');
+    }
     const { id } = req.params;
-    await PayoutEntry.markCollected(id, req.session.user.id);
+    await PayoutEntry.markCollected(id, user.id);
     req.flash('success', 'Marked as collected.');
     res.redirect('/shopee/payouts');
   },

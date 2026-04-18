@@ -3,7 +3,7 @@
   <p class="text-gray-500 text-sm mb-6">Track affiliate payouts from Shopee. Upload invoices or add manually.</p>
 
   <!-- Stats -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Total Entries</p>
       <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
@@ -12,6 +12,11 @@
       <p class="text-xs font-medium text-gray-500">Total (MYR)</p>
       <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
       <p class="text-xs text-indigo-500 font-medium">IDR <%= Math.round(parseFloat(stats.total_idr)).toLocaleString('id-ID') %></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <p class="text-xs font-medium text-gray-500">Processing</p>
+      <p class="text-2xl font-bold text-blue-600 mt-1"><%= parseInt(stats.processing_count || 0) %></p>
+      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Pending Collection</p>
@@ -26,7 +31,7 @@
   </div>
 
   <!-- Input Section -->
-  <% if (isISHAdmin) { %>
+  <% if (!isStudio || true) { %>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <!-- Upload PDFs -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -119,16 +124,16 @@
                 <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
                 <td class="px-4 py-3 text-right text-indigo-600 font-medium"><%= parseInt(e.payout_amount_idr || 0).toLocaleString('id-ID') %></td>
                 <td class="px-4 py-3 text-center">
-                  <% const colors = {pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-blue-100 text-blue-700',confirmed:'bg-gray-100 text-gray-600'}; %>
+                <% const colors = {processing:'bg-blue-100 text-blue-700',pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-indigo-100 text-indigo-700',confirmed:'bg-gray-100 text-gray-600'}; %>
                   <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                  <% if (e.payment_status === 'pending') { %>
+                  <% if ((isMYAdmin || isSuperAdmin) && (e.payment_status === 'processing' || e.payment_status === 'pending')) { %>
                     <form method="POST" action="/shopee/payouts/<%= e.id %>/collect" class="inline">
                       <button class="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium">Collect</button>
                     </form>
                   <% } %>
-                  <% if (isISHAdmin && e.payment_status === 'pending') { %>
+                  <% if (isISHAdmin && (e.payment_status === 'processing' || e.payment_status === 'pending')) { %>
                     <form method="POST" action="/shopee/payouts/<%= e.id %>/delete" class="inline ml-1" onsubmit="return confirm('Delete?')">
                       <button class="text-xs px-2 py-1 text-red-400 hover:text-red-600">✕</button>
                     </form>

@@ -49,8 +49,16 @@ const PayoutEntry = {
     return rows[0] || null;
   },
 
+  async updateStatus(id, status, userId) {
+    if (status === 'collected') {
+      await db.query(`UPDATE payout_entries SET payment_status='collected', payment_time=NOW(), collected_by=? WHERE id=?`, [userId, id]);
+    } else {
+      await db.query(`UPDATE payout_entries SET payment_status=? WHERE id=?`, [status, id]);
+    }
+  },
+
   async markCollected(id, collected_by) {
-    await db.query(`UPDATE payout_entries SET payment_status='collected', payment_time=NOW(), collected_by=? WHERE id=?`, [collected_by, id]);
+    await this.updateStatus(id, 'collected', collected_by);
   },
 
   async deleteById(id) {
@@ -71,6 +79,8 @@ const PayoutEntry = {
         COUNT(*) AS total_entries,
         COALESCE(SUM(pe.payout_amount), 0) AS total_myr,
         COALESCE(SUM(pe.payout_amount_idr), 0) AS total_idr,
+        SUM(CASE WHEN pe.payment_status='processing' THEN 1 ELSE 0 END) AS processing_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='processing' THEN pe.payout_amount ELSE 0 END), 0) AS processing_myr,
         SUM(CASE WHEN pe.payment_status='pending' THEN 1 ELSE 0 END) AS pending_count,
         COALESCE(SUM(CASE WHEN pe.payment_status='pending' THEN pe.payout_amount ELSE 0 END), 0) AS pending_myr,
         SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count,
