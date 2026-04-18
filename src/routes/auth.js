@@ -15,4 +15,8 @@ router.post('/setup', authController.postSetup);
 router.get('/impersonate/:id', requireAuth, requireSuperAdmin, authController.impersonate);
 router.get('/stop-impersonate', requireAuth, authController.stopImpersonate);
 
+// Change password (all authenticated users)
+router.get('/change-password', requireAuth, authController.getChangePassword);
+router.post('/change-password', requireAuth, authController.postChangePassword);
+
 module.exports = router;

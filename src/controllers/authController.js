@@ -96,6 +96,33 @@ const authController = {
     } else {
       res.redirect('/dashboard');
     }
+  },
+
+  getChangePassword(req, res) {
+    res.render('auth/change-password', { title: 'Change Password', user: req.session.user });
+  },
+
+  async postChangePassword(req, res) {
+    const { current_password, new_password, confirm_password } = req.body;
+    if (new_password !== confirm_password) {
+      req.flash('error', 'New passwords do not match.');
+      return res.redirect('/auth/change-password');
+    }
+    if (new_password.length < 6) {
+      req.flash('error', 'Password must be at least 6 characters.');
+      return res.redirect('/auth/change-password');
+    }
+    const [rows] = await db.query('SELECT id, password_hash FROM users WHERE id=?', [req.session.user.id]);
+    const user = rows[0];
+    if (!user) { req.flash('error', 'User not found.'); return res.redirect('/auth/change-password'); }
+    const valid = await User.verifyPassword(current_password, user.password_hash);
+    if (!valid) {
+      req.flash('error', 'Current password is incorrect.');
+      return res.redirect('/auth/change-password');
+    }
+    await User.updatePassword(user.id, new_password);
+    req.flash('success', 'Password updated successfully.');
+    res.redirect('/auth/change-password');
   }
 };
 
