@@ -45,8 +45,8 @@ function attachLocals(req, res, next) {
   res.locals.flash_success   = req.flash('success');
   res.locals.flash_error     = req.flash('error');
 
-  res.locals.isSuperAdmin    = user?.role === 'superadmin' || isImpersonating;
-  res.locals.isISHAdmin      = ['superadmin','indonesia_admin'].includes(user?.role) || isImpersonating;
+  res.locals.isSuperAdmin    = user?.role === 'superadmin';
+  res.locals.isISHAdmin      = ['superadmin','indonesia_admin'].includes(user?.role);
   res.locals.isMYAdmin       = user?.role === 'malaysia_admin';
   res.locals.isStudio        = user?.role === 'studio';
   res.locals.studioId        = user?.studio_id || null;
