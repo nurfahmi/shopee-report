@@ -109,8 +109,14 @@
             <tr>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">MYR</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">~IDR</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Invoice</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">
+                <% if (user.role === 'malaysia_admin') { %>Transfer
+                <% } else if (user.role === 'indonesia_admin') { %>Earnings
+                <% } else if (user.role === 'studio') { %>Net Payout
+                <% } else { %>Net
+                <% } %>
+              </th>
               <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600"></th>
             </tr>
@@ -161,7 +167,26 @@
                 </td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
                 <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
-                <td class="px-4 py-3 text-right text-indigo-600 font-medium"><%= parseInt(e.payout_amount_idr || 0).toLocaleString('id-ID') %></td>
+                <%
+                  const amt = parseFloat(e.payout_amount);
+                  const genDed = amt * deductions.general / 100;
+                  const myDed = amt * deductions.myAdmin / 100;
+                  const idDed = amt * deductions.idAdmin / 100;
+                  const afterMyAdmin = amt - genDed - myDed; // what MY admin transfers
+                  const idEarnings = idDed; // ID admin's earnings
+                  const studioNet = amt - genDed - myDed - idDed; // what studio gets
+                %>
+                <td class="px-4 py-3 text-right">
+                  <% if (user.role === 'malaysia_admin') { %>
+                    <span class="font-semibold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                  <% } else if (user.role === 'indonesia_admin') { %>
+                    <span class="font-semibold text-emerald-700"><%= idEarnings.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                  <% } else if (user.role === 'studio') { %>
+                    <span class="font-semibold text-emerald-700">~<%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                  <% } else { %>
+                    <span class="font-semibold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                  <% } %>
+                </td>
                 <td class="px-4 py-3 text-center">
                   <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
                 </td>

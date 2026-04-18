@@ -52,21 +52,98 @@
       </div>
 
       <div class="border-t border-gray-200 pt-4">
-        <div class="grid grid-cols-3 gap-4">
+        <%
+          const amt = parseFloat(entry.payout_amount);
+          const genDed = amt * deductions.general / 100;
+          const myDed = amt * deductions.myAdmin / 100;
+          const idDed = amt * deductions.idAdmin / 100;
+          const afterMyAdmin = amt - genDed - myDed;
+          const studioNet = amt - genDed - myDed - idDed;
+        %>
+
+        <!-- Invoice Amount (all roles) -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <p class="text-xs font-medium text-gray-500">Net Payable (MYR)</p>
-            <p class="text-2xl font-bold text-gray-800"><%= parseFloat(entry.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+            <p class="text-xs font-medium text-gray-500">Invoice Amount (MYR)</p>
+            <p class="text-2xl font-bold text-gray-800"><%= amt.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
           </div>
           <div>
             <p class="text-xs font-medium text-gray-500">Tax (MYR)</p>
             <p class="text-2xl font-bold text-gray-500"><%= parseFloat(entry.tax_amount || 0).toFixed(2) %></p>
           </div>
-          <div>
-            <p class="text-xs font-medium text-gray-500">Est. Amount (IDR)</p>
-            <p class="text-2xl font-bold text-indigo-600">~<%= parseInt(entry.payout_amount_idr || 0).toLocaleString('id-ID') %></p>
-          </div>
         </div>
-        <p class="text-xs text-gray-400 mt-1">Rate: 1 MYR = <%= rate.toLocaleString() %> IDR · Estimated — actual may differ due to transfer fees</p>
+
+        <% if (user.role === 'superadmin') { %>
+          <!-- Superadmin: full breakdown -->
+          <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">MY Admin (<%= deductions.myAdmin %>%)</span>
+              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm border-t pt-2">
+              <span class="font-medium text-gray-700">Transfer to Indonesia</span>
+              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">ID Admin (<%= deductions.idAdmin %>%)</span>
+              <span class="text-red-500">-<%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm border-t pt-2">
+              <span class="font-bold text-gray-700">Studio receives</span>
+              <span class="font-bold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+          </div>
+
+        <% } else if (user.role === 'malaysia_admin') { %>
+          <!-- MY Admin: sees general + their cut, transfer amount -->
+          <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Admin deduction (<%= deductions.myAdmin %>%)</span>
+              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm border-t pt-2">
+              <span class="font-bold text-gray-700">Transfer to Indonesia</span>
+              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+          </div>
+
+        <% } else if (user.role === 'indonesia_admin') { %>
+          <!-- ID Admin: sees received amount and their earnings (no percentage shown) -->
+          <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Received from Malaysia</span>
+              <span class="font-medium text-gray-800"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Your earnings</span>
+              <span class="font-bold text-emerald-700"><%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm border-t pt-2">
+              <span class="font-bold text-gray-700">Send to studio</span>
+              <span class="font-bold text-indigo-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+          </div>
+
+        <% } else if (user.role === 'studio') { %>
+          <!-- Studio: sees estimated net payout only -->
+          <div class="bg-emerald-50 rounded-lg p-4">
+            <div class="flex justify-between items-center">
+              <span class="font-medium text-emerald-800">Estimated Net Payout</span>
+              <span class="text-2xl font-bold text-emerald-700">~MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            </div>
+            <p class="text-xs text-emerald-600 mt-1">After all deductions · Actual may vary</p>
+          </div>
+        <% } %>
+
+        <p class="text-xs text-gray-400 mt-2">Rate: 1 MYR ≈ <%= rate.toLocaleString() %> IDR · Estimated</p>
       </div>
 
       <div class="border-t border-gray-200 pt-4">

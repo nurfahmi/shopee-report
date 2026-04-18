@@ -7,6 +7,15 @@ async function getRate() {
   return parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
 }
 
+async function getDeductions() {
+  const settings = await Setting.getAll();
+  return {
+    general: parseFloat(settings.deduction_general_percent || 0),
+    myAdmin: parseFloat(settings.deduction_my_admin_percent || 0),
+    idAdmin: parseFloat(settings.deduction_id_admin_percent || 0),
+  };
+}
+
 const payoutController = {
   // ── Main page: list all entries ─────────────────────────────────
   async index(req, res) {
@@ -16,9 +25,10 @@ const payoutController = {
     const stats = await PayoutEntry.getStats({ studioId });
     const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
     const rate = await getRate();
+    const deductions = await getDeductions();
     res.render('shopee/payouts/index', {
       title: 'Shopee Payouts',
-      entries, stats, affiliates, rate, user
+      entries, stats, affiliates, rate, deductions, user
     });
   },
 
@@ -139,9 +149,10 @@ const payoutController = {
       req.flash('error', 'Access denied.'); return res.redirect('/shopee/payouts');
     }
     const rate = await getRate();
+    const deductions = await getDeductions();
     res.render('shopee/payouts/detail', {
       title: `Payout — ${entry.affiliate_name || entry.extracted_name}`,
-      entry, rate, user
+      entry, rate, deductions, user
     });
   },
 
