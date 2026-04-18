@@ -1,25 +1,36 @@
 const db = require('../config/database');
 
 const PayoutEntry = {
-  async findAll({ limit = 100, offset = 0 } = {}) {
+  async findAll({ limit = 100, offset = 0, studioId = null } = {}) {
+    let where = '';
+    const params = [];
+    if (studioId) {
+      where = 'WHERE a.studio_id = ?';
+      params.push(studioId);
+    }
+    params.push(limit, offset);
     const [rows] = await db.query(
-      `SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number,
-              u.name AS created_by_name
+      `SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number, a.studio_id,
+              s.name AS studio_name, u.name AS created_by_name
        FROM payout_entries pe
        LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+       LEFT JOIN studios s ON a.studio_id = s.id
        LEFT JOIN users u ON pe.created_by = u.id
+       ${where}
        ORDER BY pe.invoice_date DESC, pe.created_at DESC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      params
     );
     return rows;
   },
 
   async findById(id) {
     const [rows] = await db.query(
-      `SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number
+      `SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number, a.studio_id,
+              s.name AS studio_name
        FROM payout_entries pe
        LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+       LEFT JOIN studios s ON a.studio_id = s.id
        WHERE pe.id=?`, [id]);
     return rows[0] || null;
   },
@@ -46,18 +57,28 @@ const PayoutEntry = {
     await db.query('DELETE FROM payout_entries WHERE id=?', [id]);
   },
 
-  async getStats() {
+  async getStats({ studioId = null } = {}) {
+    let join = '';
+    let where = '';
+    const params = [];
+    if (studioId) {
+      join = 'LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id';
+      where = 'WHERE a.studio_id = ?';
+      params.push(studioId);
+    }
     const [rows] = await db.query(`
       SELECT
         COUNT(*) AS total_entries,
-        COALESCE(SUM(payout_amount), 0) AS total_myr,
-        COALESCE(SUM(payout_amount_idr), 0) AS total_idr,
-        SUM(CASE WHEN payment_status='pending' THEN 1 ELSE 0 END) AS pending_count,
-        COALESCE(SUM(CASE WHEN payment_status='pending' THEN payout_amount ELSE 0 END), 0) AS pending_myr,
-        SUM(CASE WHEN payment_status='collected' THEN 1 ELSE 0 END) AS collected_count,
-        COALESCE(SUM(CASE WHEN payment_status='collected' THEN payout_amount ELSE 0 END), 0) AS collected_myr
-      FROM payout_entries
-    `);
+        COALESCE(SUM(pe.payout_amount), 0) AS total_myr,
+        COALESCE(SUM(pe.payout_amount_idr), 0) AS total_idr,
+        SUM(CASE WHEN pe.payment_status='pending' THEN 1 ELSE 0 END) AS pending_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='pending' THEN pe.payout_amount ELSE 0 END), 0) AS pending_myr,
+        SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='collected' THEN pe.payout_amount ELSE 0 END), 0) AS collected_myr
+      FROM payout_entries pe
+      ${join}
+      ${where}
+    `, params);
     return rows[0];
   }
 };

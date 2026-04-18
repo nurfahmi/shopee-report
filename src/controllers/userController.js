@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Studio = require('../models/Studio');
 
 const userController = {
   async index(req, res) {
@@ -6,34 +7,36 @@ const userController = {
     res.render('users/index', { title: 'User Management', users, user: req.session.user });
   },
 
-  getCreate(req, res) {
-    res.render('users/form', { title: 'Create User', editing: false, data: {}, user: req.session.user });
+  async getCreate(req, res) {
+    const studios = await Studio.findAll();
+    res.render('users/form', { title: 'Create User', editing: false, data: {}, studios, user: req.session.user });
   },
 
   async postCreate(req, res) {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, studio_id } = req.body;
     try {
-      await User.create({ name, email, password, role, created_by: req.session.user.id });
+      await User.create({ name, email, password, role, studio_id: role === 'studio' ? studio_id : null, created_by: req.session.user.id });
       req.flash('success', 'User created successfully.');
       res.redirect('/users');
     } catch (err) {
       req.flash('error', err.message.includes('Duplicate') ? 'Email already exists.' : err.message);
-      res.render('users/form', { title: 'Create User', editing: false, data: req.body, user: req.session.user });
+      const studios = await Studio.findAll();
+      res.render('users/form', { title: 'Create User', editing: false, data: req.body, studios, user: req.session.user });
     }
   },
 
   async getEdit(req, res) {
     const data = await User.findById(req.params.id);
     if (!data) { req.flash('error', 'User not found.'); return res.redirect('/users'); }
-    res.render('users/form', { title: 'Edit User', editing: true, data, user: req.session.user });
+    const studios = await Studio.findAll();
+    res.render('users/form', { title: 'Edit User', editing: true, data, studios, user: req.session.user });
   },
 
   async postEdit(req, res) {
-    const { name, email, role, is_active, new_password } = req.body;
+    const { name, email, role, is_active, new_password, studio_id } = req.body;
     const id = req.params.id;
-    // Protect: cannot downgrade or delete own superadmin if last one
     try {
-      await User.update(id, { name, email, role, is_active: is_active === '1' ? 1 : 0 });
+      await User.update(id, { name, email, role, is_active: is_active === '1' ? 1 : 0, studio_id: role === 'studio' ? studio_id : null });
       if (new_password && new_password.length >= 6) {
         await User.updatePassword(id, new_password);
       }

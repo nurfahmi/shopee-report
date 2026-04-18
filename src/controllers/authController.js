@@ -20,7 +20,7 @@ const authController = {
         req.flash('error', 'Invalid credentials.');
         return res.redirect('/auth/login');
       }
-      req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role };
+      req.session.user = { id: user.id, name: user.name, email: user.email, role: user.role, studio_id: user.studio_id || null };
       req.session.save(() => res.redirect('/dashboard'));
     } catch (err) {
       console.error(err);
@@ -58,7 +58,7 @@ const authController = {
 
     try {
       const insertId = await User.create({ name, email, password, role: 'superadmin', created_by: null });
-      req.session.user = { id: insertId, name, email, role: 'superadmin' };
+      req.session.user = { id: insertId, name, email, role: 'superadmin', studio_id: null };
       req.session.save(() => res.redirect('/dashboard'));
     } catch (err) {
       console.error('Setup error:', err);
@@ -77,7 +77,7 @@ const authController = {
     }
 
     req.session.originalUser = req.session.user;
-    req.session.user = { id: targetUser.id, name: targetUser.name, email: targetUser.email, role: targetUser.role };
+    req.session.user = { id: targetUser.id, name: targetUser.name, email: targetUser.email, role: targetUser.role, studio_id: targetUser.studio_id || null };
     req.session.save(() => {
       req.flash('success', `Now impersonating: ${targetUser.name} (${targetUser.role.replace('_', ' ')})`);
       res.redirect('/dashboard');

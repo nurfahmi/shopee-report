@@ -1,5 +1,4 @@
 const PayoutEntry   = require('../models/PayoutEntry');
-const PayoutHistory = require('../models/PayoutHistory');
 const Affiliate     = require('../models/Affiliate');
 const Setting       = require('../models/Setting');
 const { extractMultiplePayouts } = require('../services/ocrService');
@@ -13,14 +12,15 @@ async function getRate() {
 const payoutController = {
   // ── Main page: list all entries ─────────────────────────────────
   async index(req, res) {
-    const entries = await PayoutEntry.findAll();
-    const stats = await PayoutEntry.getStats();
-    const affiliates = await Affiliate.findAll();
+    const user = req.session.user;
+    const studioId = user.role === 'studio' ? user.studio_id : null;
+    const entries = await PayoutEntry.findAll({ studioId });
+    const stats = await PayoutEntry.getStats({ studioId });
+    const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
     const rate = await getRate();
     res.render('shopee/payouts/index', {
       title: 'Shopee Payouts',
-      entries, stats, affiliates, rate,
-      user: req.session.user
+      entries, stats, affiliates, rate, user
     });
   },
 
@@ -32,12 +32,15 @@ const payoutController = {
       return res.redirect('/shopee/payouts');
     }
 
+    const user = req.session.user;
+    const studioId = user.role === 'studio' ? user.studio_id : null;
     const rate = await getRate();
     const results = await extractMultiplePayouts(files.map(f => f.path));
     let added = 0;
     let errors = [];
-
     let skipped = 0;
+    let warnings = [];
+
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (r.error) { errors.push(`${r.file}: ${r.error}`); continue; }
@@ -48,10 +51,24 @@ const payoutController = {
         if (existing) { skipped++; continue; }
       }
 
-      // Auto-link by name
+      // Auto-link by name (studio-scoped if studio user)
       let affiliateId = null;
       if (r.supplier_name) {
-        const aff = await Affiliate.findByName(r.supplier_name);
+        let aff;
+        if (studioId) {
+          aff = await Affiliate.findByNameAndStudio(r.supplier_name, studioId);
+          if (!aff) {
+            // Check if name exists globally but not in this studio
+            const globalAff = await Affiliate.findByName(r.supplier_name);
+            if (globalAff) {
+              warnings.push(`"${r.supplier_name}" exists but belongs to another studio.`);
+            } else {
+              warnings.push(`"${r.supplier_name}" does not match any of your studio's affiliates.`);
+            }
+          }
+        } else {
+          aff = await Affiliate.findByName(r.supplier_name);
+        }
         if (aff) affiliateId = aff.id;
       }
 
@@ -73,22 +90,16 @@ const payoutController = {
         payout_amount: myr,
         tax_amount: parseFloat(r.tax_amount) || 0,
         payout_amount_idr: Math.round(myr * rate),
-        created_by: req.session.user.id
+        created_by: user.id
       });
       added++;
     }
 
-    if (errors.length) {
-      req.flash('error', `${errors.length} file(s) failed: ${errors.join('; ')}`);
-    }
-    if (skipped) {
-      req.flash('error', `${skipped} duplicate(s) skipped (invoice already exists).`);
-    }
-    if (added) {
-      req.flash('success', `${added} payout(s) extracted and saved.`);
-    } else if (!errors.length && !skipped) {
-      req.flash('error', 'No valid invoices found.');
-    }
+    if (errors.length) req.flash('error', `${errors.length} file(s) failed: ${errors.join('; ')}`);
+    if (skipped) req.flash('error', `${skipped} duplicate(s) skipped (invoice already exists).`);
+    if (warnings.length) req.flash('error', `⚠ ${warnings.join(' | ')}`);
+    if (added) req.flash('success', `${added} payout(s) extracted and saved.`);
+    else if (!errors.length && !skipped) req.flash('error', 'No valid invoices found.');
     res.redirect('/shopee/payouts');
   },
 
@@ -98,7 +109,6 @@ const payoutController = {
     const rate = await getRate();
     const myr = parseFloat(payout_amount) || 0;
 
-    // Get affiliate name from selected account
     let name = null;
     if (affiliate_account_id) {
       const aff = await Affiliate.findById(affiliate_account_id);
@@ -125,14 +135,19 @@ const payoutController = {
   async getDetail(req, res) {
     const entry = await PayoutEntry.findById(req.params.id);
     if (!entry) { req.flash('error', 'Entry not found.'); return res.redirect('/shopee/payouts'); }
+    // Studio users can only view their own entries
+    const user = req.session.user;
+    if (user.role === 'studio' && entry.studio_id !== user.studio_id) {
+      req.flash('error', 'Access denied.'); return res.redirect('/shopee/payouts');
+    }
     const rate = await getRate();
     res.render('shopee/payouts/detail', {
       title: `Payout — ${entry.affiliate_name || entry.extracted_name}`,
-      entry, rate, user: req.session.user
+      entry, rate, user
     });
   },
 
-  // ── Mark collected (MY admin) ───────────────────────────────────
+  // ── Mark collected ─────────────────────────────────────────────
   async postMarkCollected(req, res) {
     const { id } = req.params;
     await PayoutEntry.markCollected(id, req.session.user.id);

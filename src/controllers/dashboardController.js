@@ -1,6 +1,5 @@
 const PayoutEntry = require('../models/PayoutEntry');
 const Affiliate = require('../models/Affiliate');
-const Invoice = require('../models/Invoice');
 const Setting = require('../models/Setting');
 const db = require('../config/database');
 
@@ -8,18 +7,17 @@ const dashboardController = {
   async index(req, res) {
     try {
       const user = req.session.user;
+      const studioId = user.role === 'studio' ? user.studio_id : null;
       const rate = parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
 
-      // ── Shopee payout stats (entry-centric) ─────────────────────
-      const payoutStats = await PayoutEntry.getStats();
+      const payoutStats = await PayoutEntry.getStats({ studioId });
+      const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
+      const recentPayouts = await PayoutEntry.findAll({ limit: 10, studioId });
 
-      // ── Affiliate count ──────────────────────────────────────────
-      const affiliates = await Affiliate.findAll();
-
-      // ── Recent payouts (last 10) ─────────────────────────────────
-      const recentPayouts = await PayoutEntry.findAll({ limit: 10 });
-
-      // ── Per-affiliate summary ────────────────────────────────────
+      // Per-affiliate summary (scoped)
+      let studioWhere = '';
+      const params = [];
+      if (studioId) { studioWhere = 'AND a.studio_id = ?'; params.push(studioId); }
       const [affiliateSummary] = await db.query(`
         SELECT
           COALESCE(a.full_name, pe.extracted_name) AS name,
@@ -29,25 +27,25 @@ const dashboardController = {
           SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count
         FROM payout_entries pe
         LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+        WHERE 1=1 ${studioWhere}
         GROUP BY COALESCE(a.full_name, pe.extracted_name)
         ORDER BY total_myr DESC
         LIMIT 10
-      `);
+      `, params);
 
-      // ── Invoice stats (ISH admins only) ──────────────────────────
+      // Invoice stats (admin only, not studio)
       let invoiceStats = null;
-      if (user.role !== 'malaysian_admin') {
+      if (['superadmin', 'indonesia_admin'].includes(user.role)) {
         try {
           const [invRows] = await db.query(`
-            SELECT
-              COUNT(*) AS total_invoices,
+            SELECT COUNT(*) AS total_invoices,
               SUM(CASE WHEN status IN ('draft','sent','partial') THEN 1 ELSE 0 END) AS unpaid_count,
               SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END) AS total_collected,
               SUM(balance_due) AS total_outstanding
             FROM invoices
           `);
           invoiceStats = invRows[0];
-        } catch (e) { /* invoices table may not exist */ }
+        } catch (e) {}
       }
 
       res.render('dashboard/index', {

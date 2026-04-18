@@ -1,18 +1,26 @@
 const Affiliate = require('../models/Affiliate');
+const Studio = require('../models/Studio');
 
 const affiliateController = {
   async index(req, res) {
-    const affiliates = await Affiliate.findAll();
-    res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, user: req.session.user });
+    const user = req.session.user;
+    const studioId = user.role === 'studio' ? user.studio_id : null;
+    const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
+    const studios = await Studio.findAll();
+    res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, studios, user });
   },
 
-  getCreate(req, res) {
-    res.render('shopee/affiliates/form', { title: 'Add Affiliate', editing: false, data: {}, user: req.session.user });
+  async getCreate(req, res) {
+    const studios = await Studio.findAll();
+    res.render('shopee/affiliates/form', { title: 'Add Affiliate', editing: false, data: {}, studios, user: req.session.user });
   },
 
   async postCreate(req, res) {
-    const { full_name, bank_name, account_number, phone, notes } = req.body;
-    await Affiliate.create({ full_name, bank_name, account_number, phone, notes });
+    const { full_name, bank_name, account_number, phone, notes, studio_id } = req.body;
+    const user = req.session.user;
+    // Studio users always create under their studio
+    const sid = user.role === 'studio' ? user.studio_id : (studio_id || null);
+    await Affiliate.create({ full_name, bank_name, account_number, phone, notes, studio_id: sid });
     req.flash('success', 'Affiliate account added.');
     res.redirect('/shopee/affiliates');
   },
@@ -20,12 +28,20 @@ const affiliateController = {
   async getEdit(req, res) {
     const data = await Affiliate.findById(req.params.id);
     if (!data) { req.flash('error', 'Not found.'); return res.redirect('/shopee/affiliates'); }
-    res.render('shopee/affiliates/form', { title: 'Edit Affiliate', editing: true, data, user: req.session.user });
+    // Studio users can only edit their own affiliates
+    const user = req.session.user;
+    if (user.role === 'studio' && data.studio_id !== user.studio_id) {
+      req.flash('error', 'Access denied.'); return res.redirect('/shopee/affiliates');
+    }
+    const studios = await Studio.findAll();
+    res.render('shopee/affiliates/form', { title: 'Edit Affiliate', editing: true, data, studios, user });
   },
 
   async postEdit(req, res) {
-    const { full_name, bank_name, account_number, phone, notes, is_active } = req.body;
-    await Affiliate.update(req.params.id, { full_name, bank_name, account_number, phone, notes, is_active: is_active === '1' ? 1 : 0 });
+    const { full_name, bank_name, account_number, phone, notes, is_active, studio_id } = req.body;
+    const user = req.session.user;
+    const sid = user.role === 'studio' ? user.studio_id : (studio_id || null);
+    await Affiliate.update(req.params.id, { full_name, bank_name, account_number, phone, notes, is_active: is_active === '1' ? 1 : 0, studio_id: sid });
     req.flash('success', 'Affiliate updated.');
     res.redirect('/shopee/affiliates');
   },

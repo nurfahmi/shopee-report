@@ -1,0 +1,39 @@
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800">Studios</h1>
+    <p class="text-gray-500 text-sm mt-1">Manage Shopee affiliate studios</p>
+  </div>
+  <a href="/studios/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Add Studio
+  </a>
+</div>
+
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="text-left px-5 py-3 font-semibold text-gray-600">Studio Name</th>
+        <th class="text-left px-5 py-3 font-semibold text-gray-600">Created</th>
+        <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      <% if (!studios.length) { %>
+        <tr><td colspan="3" class="px-5 py-8 text-center text-gray-400">No studios yet.</td></tr>
+      <% } %>
+      <% studios.forEach(s => { %>
+        <tr class="hover:bg-gray-50">
+          <td class="px-5 py-3 font-medium text-gray-800"><%= s.name %></td>
+          <td class="px-5 py-3 text-gray-500"><%= new Date(s.created_at).toLocaleDateString('en-GB') %></td>
+          <td class="px-5 py-3 text-right space-x-2">
+            <a href="/studios/<%= s.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
+            <form method="POST" action="/studios/<%= s.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
+              <button class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

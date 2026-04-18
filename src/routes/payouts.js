@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const payoutController = require('../controllers/payoutController');
-const { requireAuth, requireAnyAdmin } = require('../middleware/auth');
+const { requireAuth, requireStudioOrUp } = require('../middleware/auth');
 const { shopeeInvoiceUpload } = require('../middleware/upload');
 
-router.use(requireAuth, requireAnyAdmin);
+router.use(requireAuth, requireStudioOrUp);
 
 // Converter (before /:id)
 router.get('/tools/converter', payoutController.getConverter);
@@ -12,7 +12,7 @@ router.get('/tools/converter', payoutController.getConverter);
 // Main list
 router.get('/', payoutController.index);
 
-// Upload invoices (OCR extract + auto-link)
+// Upload invoices
 router.post('/upload', shopeeInvoiceUpload.array('shopee_invoices', 50), payoutController.postUpload);
 
 // Manual add
@@ -22,7 +22,7 @@ router.post('/add', payoutController.postManualEntry);
 router.post('/:id/collect', payoutController.postMarkCollected);
 router.post('/:id/delete', payoutController.postDelete);
 
-// Detail (must be after /tools/ and specific POST routes)
+// Detail
 router.get('/:id', payoutController.getDetail);
 
 module.exports = router;

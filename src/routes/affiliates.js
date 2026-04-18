@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const affiliateController = require('../controllers/affiliateController');
-const { requireAuth, requireISHAdmin } = require('../middleware/auth');
+const { requireAuth, requireStudioOrUp } = require('../middleware/auth');
 
-router.use(requireAuth);
+router.use(requireAuth, requireStudioOrUp);
 
 router.get('/', affiliateController.index);
-router.get('/create', requireISHAdmin, affiliateController.getCreate);
-router.post('/create', requireISHAdmin, affiliateController.postCreate);
-router.get('/:id/edit', requireISHAdmin, affiliateController.getEdit);
-router.post('/:id/edit', requireISHAdmin, affiliateController.postEdit);
-router.post('/:id/delete', requireISHAdmin, affiliateController.postDelete);
+router.get('/create', affiliateController.getCreate);
+router.post('/create', affiliateController.postCreate);
+router.get('/:id/edit', affiliateController.getEdit);
+router.post('/:id/edit', affiliateController.postEdit);
+router.post('/:id/delete', affiliateController.postDelete);
 
 module.exports = router;

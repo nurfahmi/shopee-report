@@ -49,8 +49,15 @@ async function syncDatabase() {
       created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS studios (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      name         VARCHAR(200) NOT NULL,
+      created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS affiliate_accounts (
       id             INT AUTO_INCREMENT PRIMARY KEY,
+      studio_id      INT NULL,
       full_name      VARCHAR(200) NOT NULL,
       bank_name      VARCHAR(150) NOT NULL,
       account_number VARCHAR(100) NOT NULL,
@@ -58,7 +65,8 @@ async function syncDatabase() {
       notes          TEXT NULL,
       is_active      TINYINT(1) NOT NULL DEFAULT 1,
       created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (studio_id) REFERENCES studios(id) ON DELETE SET NULL
     )`,
     `CREATE TABLE IF NOT EXISTS payout_periods (
       id                   INT AUTO_INCREMENT PRIMARY KEY,
@@ -228,6 +236,24 @@ async function syncDatabase() {
 
   // Unique index on invoice_number for duplicate prevention
   try { await connection.query('CREATE UNIQUE INDEX idx_invoice_number ON payout_entries (invoice_number)'); } catch(e) {}
+
+  // ── Studio role migrations ──────────────────────────────────────
+  // Add studio_id to users
+  await addColumnIfMissing(connection, 'users', 'studio_id', 'INT NULL AFTER role');
+
+  // Add studio_id to affiliate_accounts
+  await addColumnIfMissing(connection, 'affiliate_accounts', 'studio_id', 'INT NULL AFTER id');
+
+  // Expand role ENUM to include new roles
+  try {
+    await connection.query(`ALTER TABLE users MODIFY COLUMN role ENUM('superadmin','my_admin','malaysian_admin','indonesia_admin','malaysia_admin','studio') NOT NULL DEFAULT 'studio'`);
+  } catch(e) {}
+
+  // Rename old roles to new roles
+  try {
+    await connection.query(`UPDATE users SET role='indonesia_admin' WHERE role='my_admin'`);
+    await connection.query(`UPDATE users SET role='malaysia_admin' WHERE role='malaysian_admin'`);
+  } catch(e) {}
 
   // Seed default settings if empty
   const [settingsRows] = await connection.query('SELECT COUNT(*) AS c FROM settings');

@@ -8,30 +8,33 @@ const User = {
   },
 
   async findById(id) {
-    const [rows] = await db.query('SELECT id, name, email, role, is_active, created_at FROM users WHERE id = ?', [id]);
+    const [rows] = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, u.studio_id, u.is_active, u.created_at, s.name AS studio_name
+       FROM users u LEFT JOIN studios s ON u.studio_id = s.id WHERE u.id = ?`, [id]);
     return rows[0] || null;
   },
 
   async findAll() {
     const [rows] = await db.query(
-      'SELECT id, name, email, role, is_active, created_at FROM users ORDER BY role, name'
+      `SELECT u.id, u.name, u.email, u.role, u.studio_id, u.is_active, u.created_at, s.name AS studio_name
+       FROM users u LEFT JOIN studios s ON u.studio_id = s.id ORDER BY u.role, u.name`
     );
     return rows;
   },
 
-  async create({ name, email, password, role, created_by }) {
+  async create({ name, email, password, role, studio_id, created_by }) {
     const hash = await bcrypt.hash(password, 10);
     const [result] = await db.query(
-      'INSERT INTO users (name, email, password_hash, role, created_by) VALUES (?, ?, ?, ?, ?)',
-      [name, email, hash, role, created_by]
+      'INSERT INTO users (name, email, password_hash, role, studio_id, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, hash, role, studio_id || null, created_by]
     );
     return result.insertId;
   },
 
-  async update(id, { name, email, role, is_active }) {
+  async update(id, { name, email, role, is_active, studio_id }) {
     await db.query(
-      'UPDATE users SET name=?, email=?, role=?, is_active=? WHERE id=?',
-      [name, email, role, is_active, id]
+      'UPDATE users SET name=?, email=?, role=?, is_active=?, studio_id=? WHERE id=?',
+      [name, email, role, is_active, studio_id || null, id]
     );
   },
 
