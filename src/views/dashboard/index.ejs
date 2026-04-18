@@ -23,43 +23,42 @@
     </div>
     <p class="text-3xl font-bold text-gray-800 mt-3"><%= parseFloat(payoutStats.total_myr).toLocaleString('en-MY', {minimumFractionDigits:2}) %></p>
     <p class="text-xs text-indigo-500 font-medium mt-1">~IDR <%= Math.round(parseFloat(payoutStats.total_idr)).toLocaleString('id-ID') %></p>
-    <p class="text-xs text-gray-400">Estimated — actual may differ due to transfer fees</p>
+    <p class="text-xs text-gray-400">Estimated — actual may differ</p>
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <div class="flex items-center justify-between">
-      <p class="text-sm font-medium text-gray-500">Pending Collection</p>
-      <span class="bg-amber-100 text-amber-600 p-2 rounded-lg">
+      <p class="text-sm font-medium text-gray-500">Processing</p>
+      <span class="bg-blue-100 text-blue-600 p-2 rounded-lg">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       </span>
     </div>
-    <p class="text-3xl font-bold text-amber-600 mt-3"><%= parseInt(payoutStats.pending_count) %></p>
-    <p class="text-xs text-gray-400 mt-1">MYR <%= parseFloat(payoutStats.pending_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %> to collect</p>
+    <p class="text-3xl font-bold text-blue-600 mt-3"><%= parseInt(payoutStats.processing_count || 0) %></p>
+    <p class="text-xs text-gray-400 mt-1">MYR <%= parseFloat(payoutStats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
   </div>
 
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <div class="flex items-center justify-between">
-      <p class="text-sm font-medium text-gray-500">Collected</p>
+      <p class="text-sm font-medium text-gray-500">Completed</p>
       <span class="bg-emerald-100 text-emerald-600 p-2 rounded-lg">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       </span>
     </div>
-    <p class="text-3xl font-bold text-emerald-600 mt-3"><%= parseInt(payoutStats.collected_count) %></p>
-    <p class="text-xs text-gray-400 mt-1">MYR <%= parseFloat(payoutStats.collected_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %> collected</p>
+    <p class="text-3xl font-bold text-emerald-600 mt-3"><%= parseInt(payoutStats.completed_count || 0) %></p>
+    <p class="text-xs text-gray-400 mt-1">MYR <%= parseFloat(payoutStats.completed_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
   </div>
 </div>
 
 <!-- Quick Info Row -->
 <div class="grid grid-cols-2 md:grid-cols-3 gap-5 mt-4">
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-    <p class="text-sm font-medium text-gray-500">Active Affiliates</p>
+    <p class="text-sm font-medium text-gray-500">Active Accounts</p>
     <p class="text-2xl font-bold text-gray-800 mt-2"><%= affiliates.filter(a => a.is_active).length %></p>
-    <a href="/shopee/affiliates" class="text-xs text-indigo-600 hover:underline">Manage →</a>
+    <a href="/shopee/affiliates" class="text-xs text-indigo-600 hover:underline">View →</a>
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-sm font-medium text-gray-500">Exchange Rate</p>
     <p class="text-2xl font-bold text-gray-800 mt-2">1 MYR = <%= rate.toLocaleString() %> IDR</p>
-    <a href="/settings" class="text-xs text-indigo-600 hover:underline">Update →</a>
   </div>
 </div>
 
@@ -67,13 +66,13 @@
   <!-- Per-Affiliate Summary -->
   <div>
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-gray-800">Per-Affiliate Summary</h2>
+      <h2 class="text-lg font-semibold text-gray-800">Per-Account Summary</h2>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
           <tr>
-            <th class="text-left px-4 py-3 font-semibold text-gray-600">Affiliate</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-600">Account</th>
             <th class="text-right px-4 py-3 font-semibold text-gray-600">Entries</th>
             <th class="text-right px-4 py-3 font-semibold text-gray-600">Total MYR</th>
             <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
@@ -89,10 +88,12 @@
               <td class="px-4 py-3 text-right text-gray-600"><%= a.entry_count %></td>
               <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(a.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
               <td class="px-4 py-3 text-center">
-                <% if (parseInt(a.pending_count) > 0) { %>
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"><%= a.pending_count %> pending</span>
+                <% if (parseInt(a.processing_count) > 0) { %>
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><%= a.processing_count %> processing</span>
+                <% } else if (parseInt(a.completed_count) === parseInt(a.entry_count)) { %>
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">all completed</span>
                 <% } else { %>
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">all collected</span>
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">in progress</span>
                 <% } %>
               </td>
             </tr>
@@ -123,6 +124,16 @@
             <tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">No payouts yet. <a href="/shopee/payouts" class="text-indigo-600 hover:underline">Upload invoices</a></td></tr>
           <% } %>
           <% recentPayouts.forEach(e => { %>
+            <%
+              const colors = {
+                processing:'bg-blue-100 text-blue-700',
+                collected:'bg-amber-100 text-amber-700',
+                transferring:'bg-indigo-100 text-indigo-700',
+                received:'bg-purple-100 text-purple-700',
+                distributed:'bg-orange-100 text-orange-700',
+                completed:'bg-emerald-100 text-emerald-700'
+              };
+            %>
             <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
               <td class="px-4 py-3">
                 <p class="font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></p>
@@ -131,7 +142,6 @@
               <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
               <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
               <td class="px-4 py-3 text-center">
-                <% const colors = {pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-blue-100 text-blue-700',confirmed:'bg-gray-100 text-gray-600'}; %>
                 <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
               </td>
             </tr>

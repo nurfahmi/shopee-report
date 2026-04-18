@@ -23,8 +23,8 @@ const dashboardController = {
           COALESCE(a.full_name, pe.extracted_name) AS name,
           COUNT(*) AS entry_count,
           COALESCE(SUM(pe.payout_amount), 0) AS total_myr,
-          SUM(CASE WHEN pe.payment_status='pending' THEN 1 ELSE 0 END) AS pending_count,
-          SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count
+          SUM(CASE WHEN pe.payment_status='processing' THEN 1 ELSE 0 END) AS processing_count,
+          SUM(CASE WHEN pe.payment_status='completed' THEN 1 ELSE 0 END) AS completed_count
         FROM payout_entries pe
         LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
         WHERE 1=1 ${studioWhere}
