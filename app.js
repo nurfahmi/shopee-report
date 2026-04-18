@@ -110,7 +110,7 @@ async function start() {
     console.log('✓ Database pool ready');
 
     app.listen(PORT, () => {
-      console.log(`✓ ISH Invoice System running on http://localhost:${PORT}`);
+      console.log(`✓ Shopee Report running on http://localhost:${PORT}`);
     });
   } catch (err) {
     console.error('✗ Startup failed:', err.message);
