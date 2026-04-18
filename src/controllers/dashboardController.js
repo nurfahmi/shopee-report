@@ -33,25 +33,9 @@ const dashboardController = {
         LIMIT 10
       `, params);
 
-      // Invoice stats (admin only, not studio)
-      let invoiceStats = null;
-      if (['superadmin', 'indonesia_admin'].includes(user.role)) {
-        try {
-          const [invRows] = await db.query(`
-            SELECT COUNT(*) AS total_invoices,
-              SUM(CASE WHEN status IN ('draft','sent','partial') THEN 1 ELSE 0 END) AS unpaid_count,
-              SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END) AS total_collected,
-              SUM(balance_due) AS total_outstanding
-            FROM invoices
-          `);
-          invoiceStats = invRows[0];
-        } catch (e) {}
-      }
-
       res.render('dashboard/index', {
         title: 'Dashboard — Shopee Report',
-        payoutStats, affiliates, recentPayouts, affiliateSummary,
-        invoiceStats, rate, user
+        payoutStats, affiliates, recentPayouts, affiliateSummary, rate, user
       });
     } catch (err) {
       console.error('Dashboard error:', err);

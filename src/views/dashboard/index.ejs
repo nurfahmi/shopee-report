@@ -60,13 +60,6 @@
     <p class="text-2xl font-bold text-gray-800 mt-2">1 MYR = <%= rate.toLocaleString() %> IDR</p>
     <a href="/settings" class="text-xs text-indigo-600 hover:underline">Update →</a>
   </div>
-  <% if (invoiceStats) { %>
-  <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-    <p class="text-sm font-medium text-gray-500">Outstanding Invoices</p>
-    <p class="text-2xl font-bold text-red-500 mt-2">MYR <%= (parseFloat(invoiceStats.total_outstanding) || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-    <p class="text-xs text-gray-400"><%= invoiceStats.unpaid_count || 0 %> unpaid</p>
-  </div>
-  <% } %>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">

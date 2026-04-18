@@ -71,11 +71,9 @@ app.use('/auth',              require('./src/routes/auth'));
 app.use('/dashboard',         require('./src/routes/dashboard'));
 app.use('/users',             require('./src/routes/users'));
 app.use('/settings',          require('./src/routes/settings'));
-app.use('/business-profiles', require('./src/routes/businessProfiles'));
 app.use('/shopee/affiliates', require('./src/routes/affiliates'));
 app.use('/shopee/payouts',    require('./src/routes/payouts'));
 app.use('/studios',           require('./src/routes/studios'));
-app.use('/invoices',          require('./src/routes/invoices'));
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((req, res) => {
