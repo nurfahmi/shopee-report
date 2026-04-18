@@ -81,10 +81,13 @@ const PayoutEntry = {
         COALESCE(SUM(pe.payout_amount_idr), 0) AS total_idr,
         SUM(CASE WHEN pe.payment_status='processing' THEN 1 ELSE 0 END) AS processing_count,
         COALESCE(SUM(CASE WHEN pe.payment_status='processing' THEN pe.payout_amount ELSE 0 END), 0) AS processing_myr,
-        SUM(CASE WHEN pe.payment_status='pending' THEN 1 ELSE 0 END) AS pending_count,
-        COALESCE(SUM(CASE WHEN pe.payment_status='pending' THEN pe.payout_amount ELSE 0 END), 0) AS pending_myr,
         SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count,
-        COALESCE(SUM(CASE WHEN pe.payment_status='collected' THEN pe.payout_amount ELSE 0 END), 0) AS collected_myr
+        COALESCE(SUM(CASE WHEN pe.payment_status='collected' THEN pe.payout_amount ELSE 0 END), 0) AS collected_myr,
+        SUM(CASE WHEN pe.payment_status='transferring' THEN 1 ELSE 0 END) AS transferring_count,
+        SUM(CASE WHEN pe.payment_status='received' THEN 1 ELSE 0 END) AS received_count,
+        SUM(CASE WHEN pe.payment_status='distributed' THEN 1 ELSE 0 END) AS distributed_count,
+        SUM(CASE WHEN pe.payment_status='completed' THEN 1 ELSE 0 END) AS completed_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='completed' THEN pe.payout_amount ELSE 0 END), 0) AS completed_myr
       FROM payout_entries pe
       ${join}
       ${where}

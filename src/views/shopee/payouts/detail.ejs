@@ -73,7 +73,29 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <p class="text-xs font-medium text-gray-500">Status</p>
-            <% const colors = {pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-blue-100 text-blue-700',confirmed:'bg-gray-100 text-gray-600'}; %>
+            <%
+              const colors = {
+                processing:'bg-blue-100 text-blue-700',
+                collected:'bg-amber-100 text-amber-700',
+                transferring:'bg-indigo-100 text-indigo-700',
+                received:'bg-purple-100 text-purple-700',
+                distributed:'bg-orange-100 text-orange-700',
+                completed:'bg-emerald-100 text-emerald-700'
+              };
+              const role = user.role;
+              let nextAction = null;
+              if (entry.payment_status === 'processing' && (role === 'malaysia_admin' || role === 'superadmin')) {
+                nextAction = { status: 'collected', label: 'Mark Collected', color: 'bg-amber-600 hover:bg-amber-500' };
+              } else if (entry.payment_status === 'collected' && (role === 'malaysia_admin' || role === 'superadmin')) {
+                nextAction = { status: 'transferring', label: 'Mark Transferring', color: 'bg-indigo-600 hover:bg-indigo-500' };
+              } else if (entry.payment_status === 'transferring' && (role === 'indonesia_admin' || role === 'superadmin')) {
+                nextAction = { status: 'received', label: 'Mark Received', color: 'bg-purple-600 hover:bg-purple-500' };
+              } else if (entry.payment_status === 'received' && (role === 'indonesia_admin' || role === 'superadmin')) {
+                nextAction = { status: 'distributed', label: 'Mark Distributed', color: 'bg-orange-600 hover:bg-orange-500' };
+              } else if (entry.payment_status === 'distributed' && (role === 'studio' || role === 'superadmin')) {
+                nextAction = { status: 'completed', label: 'Confirm Received', color: 'bg-emerald-600 hover:bg-emerald-500' };
+              }
+            %>
             <span class="inline-block mt-1 px-3 py-1 rounded-full text-sm font-semibold <%= colors[entry.payment_status] %>"><%= entry.payment_status.toUpperCase() %></span>
           </div>
           <div>
@@ -100,12 +122,13 @@
 
   <!-- Actions -->
   <div class="flex gap-3">
-    <% if (entry.payment_status === 'pending') { %>
-      <form method="POST" action="/shopee/payouts/<%= entry.id %>/collect">
-        <button class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm transition-colors">Mark as Collected</button>
+    <% if (nextAction) { %>
+      <form method="POST" action="/shopee/payouts/<%= entry.id %>/status">
+        <input type="hidden" name="status" value="<%= nextAction.status %>">
+        <button class="px-5 py-2 <%= nextAction.color %> text-white font-medium rounded-lg text-sm transition-colors"><%= nextAction.label %></button>
       </form>
     <% } %>
-    <% if (isISHAdmin && entry.payment_status === 'pending') { %>
+    <% if (isISHAdmin && entry.payment_status === 'processing') { %>
       <form method="POST" action="/shopee/payouts/<%= entry.id %>/delete" onsubmit="return confirm('Delete this payout entry?')">
         <button class="px-5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg text-sm border border-red-200 transition-colors">Delete</button>
       </form>

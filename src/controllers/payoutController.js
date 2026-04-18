@@ -145,16 +145,45 @@ const payoutController = {
     });
   },
 
-  // ── Mark collected (Malaysia admin only) ────────────────────────
-  async postMarkCollected(req, res) {
+  // ── Status transitions ──────────────────────────────────────────
+  // Valid transitions:
+  //   processing  → collected     (MY admin)
+  //   collected   → transferring  (MY admin)
+  //   transferring→ received      (ID admin)
+  //   received    → distributed   (ID admin)
+  //   distributed → completed     (studio)
+
+  async postUpdateStatus(req, res) {
+    const { id } = req.params;
+    const { status } = req.body;
     const user = req.session.user;
-    if (user.role !== 'malaysia_admin' && user.role !== 'superadmin') {
-      req.flash('error', 'Only Malaysia Admin can update payout status.');
+    const role = user.role;
+
+    // Permission matrix
+    const allowed = {
+      'collected':    ['malaysia_admin', 'superadmin'],
+      'transferring': ['malaysia_admin', 'superadmin'],
+      'received':     ['indonesia_admin', 'superadmin'],
+      'distributed':  ['indonesia_admin', 'superadmin'],
+      'completed':    ['studio', 'superadmin'],
+    };
+
+    if (!allowed[status] || !allowed[status].includes(role)) {
+      req.flash('error', `You don't have permission to set status to "${status}".`);
       return res.redirect('/shopee/payouts');
     }
-    const { id } = req.params;
-    await PayoutEntry.markCollected(id, user.id);
-    req.flash('success', 'Marked as collected.');
+
+    await PayoutEntry.updateStatus(id, status, user.id);
+
+    const labels = {
+      collected: 'Marked as collected',
+      transferring: 'Marked as transferring to Indonesia',
+      received: 'Confirmed money received in Indonesia',
+      distributed: 'Money distributed to studio',
+      completed: 'Confirmed received — completed!'
+    };
+
+    req.flash('success', labels[status] || `Status updated to ${status}`);
     res.redirect('/shopee/payouts');
   },
 

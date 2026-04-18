@@ -3,35 +3,38 @@
   <p class="text-gray-500 text-sm mb-6">Track affiliate payouts from Shopee. Upload invoices or add manually.</p>
 
   <!-- Stats -->
-  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+  <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
     <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Total Entries</p>
-      <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
+      <p class="text-xs font-medium text-gray-500">Total</p>
+      <p class="text-xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
+      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Total (MYR)</p>
-      <p class="text-2xl font-bold text-gray-800 mt-1"><%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
-      <p class="text-xs text-indigo-500 font-medium">IDR <%= Math.round(parseFloat(stats.total_idr)).toLocaleString('id-ID') %></p>
+    <div class="bg-white rounded-xl border border-blue-200 p-4">
+      <p class="text-xs font-medium text-blue-600">Processing</p>
+      <p class="text-xl font-bold text-blue-700 mt-1"><%= parseInt(stats.processing_count || 0) %></p>
+      <p class="text-xs text-blue-400"><%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Processing</p>
-      <p class="text-2xl font-bold text-blue-600 mt-1"><%= parseInt(stats.processing_count || 0) %></p>
-      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    <div class="bg-white rounded-xl border border-amber-200 p-4">
+      <p class="text-xs font-medium text-amber-600">Collected</p>
+      <p class="text-xl font-bold text-amber-700 mt-1"><%= parseInt(stats.collected_count || 0) %></p>
+      <p class="text-xs text-amber-400"><%= parseFloat(stats.collected_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Pending Collection</p>
-      <p class="text-2xl font-bold text-amber-600 mt-1"><%= parseInt(stats.pending_count) %></p>
-      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.pending_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    <div class="bg-white rounded-xl border border-indigo-200 p-4">
+      <p class="text-xs font-medium text-indigo-600">Transferring</p>
+      <p class="text-xl font-bold text-indigo-700 mt-1"><%= parseInt(stats.transferring_count || 0) %></p>
     </div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Collected</p>
-      <p class="text-2xl font-bold text-emerald-600 mt-1"><%= parseInt(stats.collected_count) %></p>
-      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.collected_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+    <div class="bg-white rounded-xl border border-purple-200 p-4">
+      <p class="text-xs font-medium text-purple-600">Received</p>
+      <p class="text-xl font-bold text-purple-700 mt-1"><%= parseInt(stats.received_count || 0) + parseInt(stats.distributed_count || 0) %></p>
+    </div>
+    <div class="bg-white rounded-xl border border-emerald-200 p-4">
+      <p class="text-xs font-medium text-emerald-600">Completed</p>
+      <p class="text-xl font-bold text-emerald-700 mt-1"><%= parseInt(stats.completed_count || 0) %></p>
+      <p class="text-xs text-emerald-400"><%= parseFloat(stats.completed_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     </div>
   </div>
 
   <!-- Input Section -->
-  <% if (!isStudio || true) { %>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <!-- Upload PDFs -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
@@ -46,7 +49,8 @@
       </form>
     </div>
 
-    <!-- Manual Add -->
+    <!-- Manual Add (admin only) -->
+    <% if (isISHAdmin || isMYAdmin) { %>
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <p class="text-sm font-semibold text-gray-700 mb-1">Add Manually</p>
       <p class="text-xs text-gray-400 mb-3">Select account holder and enter payout details.</p>
@@ -73,14 +77,25 @@
         </button>
       </form>
     </div>
+    <% } %>
   </div>
-  <% } %>
+
+  <!-- Pipeline Legend -->
+  <div class="flex items-center gap-2 text-xs text-gray-400 mb-3 flex-wrap">
+    <span class="font-medium text-gray-500">Flow:</span>
+    <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">Processing</span> →
+    <span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded">Collected</span> →
+    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded">Transferring</span> →
+    <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded">Received</span> →
+    <span class="px-2 py-0.5 bg-orange-50 text-orange-600 rounded">Distributed</span> →
+    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">Completed</span>
+  </div>
 
   <!-- Entries Table -->
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
     <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
       <p class="text-sm font-semibold text-gray-700">All Payouts</p>
-      <p class="text-xs text-gray-400">1 MYR = <%= rate.toLocaleString() %> IDR</p>
+      <p class="text-xs text-gray-400">1 MYR ≈ <%= rate.toLocaleString() %> IDR (estimated)</p>
     </div>
     <% if (!entries.length) { %>
       <div class="px-5 py-12 text-center text-gray-400">
@@ -94,16 +109,39 @@
             <tr>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
-              <th class="text-left px-4 py-3 font-semibold text-gray-600">Period</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">Tax</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600">MYR</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">IDR</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">~IDR</th>
               <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <% entries.forEach(e => { %>
+              <%
+                const colors = {
+                  processing:   'bg-blue-100 text-blue-700',
+                  collected:    'bg-amber-100 text-amber-700',
+                  transferring: 'bg-indigo-100 text-indigo-700',
+                  received:     'bg-purple-100 text-purple-700',
+                  distributed:  'bg-orange-100 text-orange-700',
+                  completed:    'bg-emerald-100 text-emerald-700'
+                };
+
+                // Next action per status + role
+                let nextAction = null;
+                const role = user.role;
+                if (e.payment_status === 'processing' && (role === 'malaysia_admin' || role === 'superadmin')) {
+                  nextAction = { status: 'collected', label: 'Collect', color: 'bg-amber-600 hover:bg-amber-500' };
+                } else if (e.payment_status === 'collected' && (role === 'malaysia_admin' || role === 'superadmin')) {
+                  nextAction = { status: 'transferring', label: 'Transfer', color: 'bg-indigo-600 hover:bg-indigo-500' };
+                } else if (e.payment_status === 'transferring' && (role === 'indonesia_admin' || role === 'superadmin')) {
+                  nextAction = { status: 'received', label: 'Received', color: 'bg-purple-600 hover:bg-purple-500' };
+                } else if (e.payment_status === 'received' && (role === 'indonesia_admin' || role === 'superadmin')) {
+                  nextAction = { status: 'distributed', label: 'Distributed', color: 'bg-orange-600 hover:bg-orange-500' };
+                } else if (e.payment_status === 'distributed' && (role === 'studio' || role === 'superadmin')) {
+                  nextAction = { status: 'completed', label: 'Confirm', color: 'bg-emerald-600 hover:bg-emerald-500' };
+                }
+              %>
               <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
                 <td class="px-4 py-3">
                   <p class="font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></p>
@@ -116,24 +154,25 @@
                     <% if (e.invoice_file_path) { %>
                       <span class="text-xs text-indigo-500">📄 pdf</span>
                     <% } %>
+                    <% if (e.studio_name) { %>
+                      <span class="text-xs text-gray-400"><%= e.studio_name %></span>
+                    <% } %>
                   </div>
                 </td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
-                <td class="px-4 py-3 text-gray-500 text-xs"><%= e.period_description || '-' %></td>
-                <td class="px-4 py-3 text-right text-gray-500"><%= parseFloat(e.tax_amount || 0).toFixed(2) %></td>
                 <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
                 <td class="px-4 py-3 text-right text-indigo-600 font-medium"><%= parseInt(e.payout_amount_idr || 0).toLocaleString('id-ID') %></td>
                 <td class="px-4 py-3 text-center">
-                <% const colors = {processing:'bg-blue-100 text-blue-700',pending:'bg-amber-100 text-amber-700',collected:'bg-emerald-100 text-emerald-700',transferred:'bg-indigo-100 text-indigo-700',confirmed:'bg-gray-100 text-gray-600'}; %>
                   <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                  <% if ((isMYAdmin || isSuperAdmin) && (e.payment_status === 'processing' || e.payment_status === 'pending')) { %>
-                    <form method="POST" action="/shopee/payouts/<%= e.id %>/collect" class="inline">
-                      <button class="text-xs px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium">Collect</button>
+                  <% if (nextAction) { %>
+                    <form method="POST" action="/shopee/payouts/<%= e.id %>/status" class="inline">
+                      <input type="hidden" name="status" value="<%= nextAction.status %>">
+                      <button class="text-xs px-2.5 py-1 <%= nextAction.color %> text-white rounded font-medium"><%= nextAction.label %></button>
                     </form>
                   <% } %>
-                  <% if (isISHAdmin && (e.payment_status === 'processing' || e.payment_status === 'pending')) { %>
+                  <% if (isISHAdmin && e.payment_status === 'processing') { %>
                     <form method="POST" action="/shopee/payouts/<%= e.id %>/delete" class="inline ml-1" onsubmit="return confirm('Delete?')">
                       <button class="text-xs px-2 py-1 text-red-400 hover:text-red-600">✕</button>
                     </form>

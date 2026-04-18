@@ -19,7 +19,7 @@ router.post('/upload', shopeeInvoiceUpload.array('shopee_invoices', 50), payoutC
 router.post('/add', payoutController.postManualEntry);
 
 // Entry actions
-router.post('/:id/collect', payoutController.postMarkCollected);
+router.post('/:id/status', payoutController.postUpdateStatus);
 router.post('/:id/delete', payoutController.postDelete);
 
 // Detail
