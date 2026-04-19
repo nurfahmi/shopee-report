@@ -68,7 +68,7 @@
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p class="text-xs font-medium text-gray-500">Invoice Amount (MYR)</p>
-            <p class="text-2xl font-bold text-gray-800"><%= amt.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+            <p class="text-2xl font-bold text-gray-800"><%= amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
           </div>
           <div>
             <p class="text-xs font-medium text-gray-500">Tax (MYR)</p>
@@ -81,15 +81,15 @@
           <p class="text-xs font-semibold text-orange-700 mb-1">Shopee Platform Fees</p>
           <div class="flex justify-between text-xs">
             <span class="text-gray-500">Service Fee (1%)</span>
-            <span class="text-red-500">-<%= shopeeServiceFee.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            <span class="text-red-500">-<%= shopeeServiceFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
           </div>
           <div class="flex justify-between text-xs">
             <span class="text-gray-500">SST on Service Fee (8%)</span>
-            <span class="text-red-500">-<%= shopeeSSTFee.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            <span class="text-red-500">-<%= shopeeSSTFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
           </div>
           <div class="flex justify-between text-xs border-t border-orange-200 pt-1">
             <span class="font-medium text-gray-700">Net after Shopee fees</span>
-            <span class="font-bold text-gray-800"><%= netAfterShopee.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+            <span class="font-bold text-gray-800"><%= netAfterShopee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
           </div>
         </div>
 
@@ -98,23 +98,23 @@
           <div class="bg-gray-50 rounded-lg p-4 space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
-              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">MY Admin (<%= deductions.myAdmin %>%)</span>
-              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-medium text-gray-700">Transfer to Indonesia</span>
-              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">ID Admin (<%= deductions.idAdmin %>%)</span>
-              <span class="text-red-500">-<%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-red-500">-<%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-bold text-gray-700">Studio receives</span>
-              <span class="font-bold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-bold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
           </div>
 
@@ -123,15 +123,15 @@
           <div class="bg-gray-50 rounded-lg p-4 space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
-              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">Admin deduction (<%= deductions.myAdmin %>%)</span>
-              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-bold text-gray-700">Transfer to Indonesia</span>
-              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-bold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
           </div>
 
@@ -140,15 +140,15 @@
           <div class="bg-gray-50 rounded-lg p-4 space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">Received from Malaysia</span>
-              <span class="font-medium text-gray-800"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-medium text-gray-800"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500">Your earnings</span>
-              <span class="font-bold text-emerald-700"><%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-bold text-emerald-700"><%= idDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-bold text-gray-700">Send to studio</span>
-              <span class="font-bold text-indigo-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="font-bold text-indigo-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
           </div>
 
@@ -157,7 +157,7 @@
           <div class="bg-emerald-50 rounded-lg p-4">
             <div class="flex justify-between items-center">
               <span class="font-medium text-emerald-800">Estimated Net Payout</span>
-              <span class="text-2xl font-bold text-emerald-700">~MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+              <span class="text-2xl font-bold text-emerald-700">~MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <p class="text-xs text-emerald-600 mt-1">After all deductions · Actual may vary</p>
           </div>

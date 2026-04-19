@@ -15,17 +15,17 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Total</p>
       <p class="text-xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
-      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
     </div>
     <div class="bg-white rounded-xl border border-blue-200 p-4">
       <p class="text-xs font-medium text-blue-600">Processing</p>
       <p class="text-xl font-bold text-blue-700 mt-1"><%= parseInt(stats.processing_count || 0) %></p>
-      <p class="text-xs text-blue-400"><%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xs text-blue-400"><%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
     </div>
     <div class="bg-white rounded-xl border border-amber-200 p-4">
       <p class="text-xs font-medium text-amber-600">Collected</p>
       <p class="text-xl font-bold text-amber-700 mt-1"><%= parseInt(stats.collected_count || 0) %></p>
-      <p class="text-xs text-amber-400"><%= parseFloat(stats.collected_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xs text-amber-400"><%= parseFloat(stats.collected_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
     </div>
     <div class="bg-white rounded-xl border border-indigo-200 p-4">
       <p class="text-xs font-medium text-indigo-600">Transferring</p>
@@ -38,7 +38,7 @@
     <div class="bg-white rounded-xl border border-emerald-200 p-4">
       <p class="text-xs font-medium text-emerald-600">Completed</p>
       <p class="text-xl font-bold text-emerald-700 mt-1"><%= parseInt(stats.completed_count || 0) %></p>
-      <p class="text-xs text-emerald-400"><%= parseFloat(stats.completed_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xs text-emerald-400"><%= parseFloat(stats.completed_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
     </div>
   </div>
 
@@ -184,7 +184,7 @@
                   </div>
                 </td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
-                <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+                <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
                 <%
                   const amt = parseFloat(e.payout_amount);
                   const netAmt = amt * (1 - 0.01 - 0.01 * 0.08);
@@ -195,16 +195,16 @@
                   const idEarnings = idDed;
                   const studioNet = netAmt - genDed - myDed - idDed;
                 %>
-                <td class="px-4 py-3 text-right font-semibold text-gray-600"><%= netAmt.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+                <td class="px-4 py-3 text-right font-semibold text-gray-600"><%= netAmt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
                 <td class="px-4 py-3 text-right">
                   <% if (user.role === 'malaysia_admin') { %>
-                    <span class="font-semibold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                    <span class="font-semibold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <% } else if (user.role === 'indonesia_admin') { %>
-                    <span class="font-semibold text-emerald-700"><%= idEarnings.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                    <span class="font-semibold text-emerald-700"><%= idEarnings.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <% } else if (user.role === 'studio') { %>
-                    <span class="font-semibold text-emerald-700">~<%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                    <span class="font-semibold text-emerald-700">~<%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <% } else { %>
-                    <span class="font-semibold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+                    <span class="font-semibold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <% } %>
                 </td>
                 <td class="px-4 py-3 text-center">

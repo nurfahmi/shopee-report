@@ -34,9 +34,9 @@
           </td>
           <td class="px-5 py-3 text-gray-600"><%= inv.client_name %></td>
           <td class="px-5 py-3 text-gray-500 text-xs"><%= inv.business_name %></td>
-          <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(inv.total || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+          <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(inv.total || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
           <td class="px-5 py-3 text-right font-medium <%= parseFloat(inv.balance_due) > 0 ? 'text-red-500' : 'text-emerald-600' %>">
-            <%= parseFloat(inv.balance_due || 0).toLocaleString('en-MY',{minimumFractionDigits:2}) %>
+            <%= parseFloat(inv.balance_due || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %>
           </td>
           <td class="px-5 py-3 text-center">
             <% const ic = {draft:'bg-gray-100 text-gray-600',sent:'bg-blue-100 text-blue-700',partial:'bg-amber-100 text-amber-700',paid:'bg-emerald-100 text-emerald-700'}; %>

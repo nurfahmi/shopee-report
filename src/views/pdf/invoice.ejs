@@ -65,8 +65,8 @@
               <%= it.description %>
             </td>
             <td class="py-2 text-right"><%= it.quantity %></td>
-            <td class="py-2 text-right"><%= parseFloat(it.unit_price).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
-            <td class="py-2 text-right font-medium"><%= parseFloat(it.amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+            <td class="py-2 text-right"><%= parseFloat(it.unit_price).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
+            <td class="py-2 text-right font-medium"><%= parseFloat(it.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
           </tr>
         <% }) %>
       </tbody>
@@ -77,26 +77,26 @@
       <div class="w-72 space-y-2">
         <div class="flex justify-between text-sm">
           <span class="text-gray-600">Subtotal</span>
-          <span class="font-medium"><%= parseFloat(invoice.subtotal).toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+          <span class="font-medium"><%= parseFloat(invoice.subtotal).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
         </div>
         <% if (parseFloat(invoice.tax_percent) > 0) { %>
         <div class="flex justify-between text-sm">
           <span class="text-gray-600">Tax (<%= invoice.tax_percent %>%)</span>
-          <span class="font-medium"><%= parseFloat(invoice.tax_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+          <span class="font-medium"><%= parseFloat(invoice.tax_amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
         </div>
         <% } %>
         <div class="flex justify-between pt-2 border-t-2 border-gray-800">
           <span class="font-bold text-base">Total</span>
-          <span class="font-bold text-lg"><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+          <span class="font-bold text-lg"><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
         </div>
         <% if (parseFloat(invoice.amount_paid) > 0) { %>
         <div class="flex justify-between text-sm text-emerald-600">
           <span>Paid</span>
-          <span>- <%= parseFloat(invoice.amount_paid).toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+          <span>- <%= parseFloat(invoice.amount_paid).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
         </div>
         <div class="flex justify-between text-sm font-bold text-red-600">
           <span>Balance Due</span>
-          <span><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.balance_due).toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
+          <span><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.balance_due).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
         </div>
         <% } %>
       </div>
@@ -121,7 +121,7 @@
             <tr class="border-b border-gray-100">
               <td class="py-1.5"><%= m.label %></td>
               <td class="py-1.5 text-right"><%= m.percent %>%</td>
-              <td class="py-1.5 text-right font-medium"><%= parseFloat(m.amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+              <td class="py-1.5 text-right font-medium"><%= parseFloat(m.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
               <td class="py-1.5"><%= m.due_date ? new Date(m.due_date).toLocaleDateString('en-GB') : '-' %></td>
               <td class="py-1.5 text-center capitalize"><%= m.status %></td>
             </tr>

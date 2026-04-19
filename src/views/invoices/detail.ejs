@@ -30,12 +30,12 @@
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Total</p>
-      <p class="text-xl font-bold text-gray-800 mt-1"><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
+      <p class="text-xl font-bold text-gray-800 mt-1"><%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Balance Due</p>
       <p class="text-xl font-bold mt-1 <%= parseFloat(invoice.balance_due) > 0 ? 'text-red-500' : 'text-emerald-600' %>">
-        <%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.balance_due).toLocaleString('en-MY',{minimumFractionDigits:2}) %>
+        <%= invoice.currency || 'MYR' %> <%= parseFloat(invoice.balance_due).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %>
       </p>
     </div>
   </div>
@@ -59,25 +59,25 @@
             <td class="px-5 py-3 text-gray-500"><%= it.phase_label || '' %></td>
             <td class="px-5 py-3 text-gray-800"><%= it.description %></td>
             <td class="px-5 py-3 text-right text-gray-600"><%= it.quantity %></td>
-            <td class="px-5 py-3 text-right text-gray-600"><%= parseFloat(it.unit_price).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
-            <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(it.amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+            <td class="px-5 py-3 text-right text-gray-600"><%= parseFloat(it.unit_price).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
+            <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(it.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
           </tr>
         <% }) %>
       </tbody>
       <tfoot class="bg-gray-50">
         <tr class="border-t border-gray-200">
           <td colspan="4" class="px-5 py-2 text-right text-sm text-gray-600">Subtotal</td>
-          <td class="px-5 py-2 text-right font-medium text-gray-800"><%= parseFloat(invoice.subtotal).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+          <td class="px-5 py-2 text-right font-medium text-gray-800"><%= parseFloat(invoice.subtotal).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
         </tr>
         <% if (parseFloat(invoice.tax_percent) > 0) { %>
         <tr>
           <td colspan="4" class="px-5 py-2 text-right text-sm text-gray-600">Tax (<%= invoice.tax_percent %>%)</td>
-          <td class="px-5 py-2 text-right font-medium text-gray-800"><%= parseFloat(invoice.tax_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+          <td class="px-5 py-2 text-right font-medium text-gray-800"><%= parseFloat(invoice.tax_amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
         </tr>
         <% } %>
         <tr class="border-t border-gray-300">
           <td colspan="4" class="px-5 py-3 text-right text-sm font-bold text-gray-800">Total</td>
-          <td class="px-5 py-3 text-right font-bold text-gray-800 text-lg"><%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+          <td class="px-5 py-3 text-right font-bold text-gray-800 text-lg"><%= parseFloat(invoice.total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
         </tr>
       </tfoot>
     </table>
@@ -102,7 +102,7 @@
           <tr>
             <td class="px-5 py-3 font-medium text-gray-800"><%= m.label %></td>
             <td class="px-5 py-3 text-right text-gray-600"><%= m.percent %>%</td>
-            <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(m.amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+            <td class="px-5 py-3 text-right font-medium text-gray-800"><%= parseFloat(m.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
             <td class="px-5 py-3 text-gray-600"><%= m.due_date ? new Date(m.due_date).toLocaleDateString('en-GB') : '-' %></td>
             <td class="px-5 py-3 text-center">
               <% const mc = {pending:'bg-amber-100 text-amber-700',invoiced:'bg-blue-100 text-blue-700',paid:'bg-emerald-100 text-emerald-700'}; %>
@@ -135,7 +135,7 @@
         <% payments.forEach(p => { %>
           <tr>
             <td class="px-5 py-3 text-gray-600"><%= new Date(p.payment_date).toLocaleDateString('en-GB') %></td>
-            <td class="px-5 py-3 text-right font-medium text-emerald-600">+ <%= parseFloat(p.amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+            <td class="px-5 py-3 text-right font-medium text-emerald-600">+ <%= parseFloat(p.amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
             <td class="px-5 py-3 text-gray-600"><%= p.method || '-' %></td>
             <td class="px-5 py-3 text-gray-600"><%= p.reference || '-' %></td>
             <td class="px-5 py-3 text-gray-500 text-xs"><%= p.notes || '' %></td>
