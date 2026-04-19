@@ -5,10 +5,19 @@
       <p class="text-gray-500 text-sm mt-1">Shopee affiliate bank accounts receiving payouts</p>
     </div>
     <% if (isISHAdmin) { %>
-      <a href="/shopee/affiliates/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        Add Account
-      </a>
+      <div class="flex items-center gap-3">
+        <form method="POST" action="/shopee/affiliates/upload-statement" enctype="multipart/form-data" class="flex items-center gap-2">
+          <input type="file" name="bank_statement" accept=".pdf" required
+            class="text-sm file:mr-2 file:py-1.5 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 file:rounded-lg file:cursor-pointer">
+          <button type="submit" class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg text-xs transition-colors whitespace-nowrap">
+            Extract from PDF
+          </button>
+        </form>
+        <a href="/shopee/affiliates/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors whitespace-nowrap">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add Manual
+        </a>
+      </div>
     <% } %>
   </div>
 

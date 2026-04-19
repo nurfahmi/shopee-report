@@ -1,5 +1,6 @@
 const Affiliate = require('../models/Affiliate');
 const Studio = require('../models/Studio');
+const { extractBankStatement } = require('../services/ocrService');
 
 const affiliateController = {
   async index(req, res) {
@@ -10,15 +11,40 @@ const affiliateController = {
     res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, studios, user });
   },
 
+  async postUploadStatement(req, res) {
+    if (!req.file) {
+      req.flash('error', 'No file uploaded.');
+      return res.redirect('/shopee/affiliates');
+    }
+    try {
+      const result = await extractBankStatement(req.file.path);
+      const studios = await Studio.findAll();
+      res.render('shopee/affiliates/form', {
+        title: 'Add Account from Statement',
+        editing: false,
+        data: {
+          full_name: result.account_holder || '',
+          bank_name: result.bank_name || '',
+          account_number: result.account_number || '',
+        },
+        studios,
+        extractResult: result,
+        user: req.session.user
+      });
+    } catch (err) {
+      req.flash('error', `Failed to extract: ${err.message}`);
+      res.redirect('/shopee/affiliates');
+    }
+  },
+
   async getCreate(req, res) {
     const studios = await Studio.findAll();
-    res.render('shopee/affiliates/form', { title: 'Add Affiliate', editing: false, data: {}, studios, user: req.session.user });
+    res.render('shopee/affiliates/form', { title: 'Add Affiliate', editing: false, data: {}, studios, extractResult: null, user: req.session.user });
   },
 
   async postCreate(req, res) {
     const { full_name, bank_name, account_number, phone, notes, studio_id } = req.body;
     const user = req.session.user;
-    // Studio users always create under their studio
     const sid = user.role === 'studio' ? user.studio_id : (studio_id || null);
     await Affiliate.create({ full_name, bank_name, account_number, phone, notes, studio_id: sid });
     req.flash('success', 'Affiliate account added.');
@@ -28,13 +54,12 @@ const affiliateController = {
   async getEdit(req, res) {
     const data = await Affiliate.findById(req.params.id);
     if (!data) { req.flash('error', 'Not found.'); return res.redirect('/shopee/affiliates'); }
-    // Studio users can only edit their own affiliates
     const user = req.session.user;
     if (user.role === 'studio' && data.studio_id !== user.studio_id) {
       req.flash('error', 'Access denied.'); return res.redirect('/shopee/affiliates');
     }
     const studios = await Studio.findAll();
-    res.render('shopee/affiliates/form', { title: 'Edit Affiliate', editing: true, data, studios, user });
+    res.render('shopee/affiliates/form', { title: 'Edit Affiliate', editing: true, data, studios, extractResult: null, user });
   },
 
   async postEdit(req, res) {
@@ -54,3 +79,4 @@ const affiliateController = {
 };
 
 module.exports = affiliateController;
+
