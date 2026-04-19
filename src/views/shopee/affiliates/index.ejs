@@ -28,8 +28,8 @@
           <th class="text-left px-5 py-3 font-semibold text-gray-600">Account Holder</th>
           <th class="text-left px-5 py-3 font-semibold text-gray-600">Bank</th>
           <th class="text-left px-5 py-3 font-semibold text-gray-600">Account No.</th>
+          <th class="text-right px-5 py-3 font-semibold text-gray-600">Payouts</th>
           <% if (user.role !== 'malaysia_admin') { %>
-            <th class="text-left px-5 py-3 font-semibold text-gray-600">Shopee ID</th>
             <th class="text-left px-5 py-3 font-semibold text-gray-600">Phone</th>
             <th class="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
           <% } %>
@@ -47,8 +47,15 @@
             <td class="px-5 py-3 font-medium text-gray-800"><%= a.full_name %></td>
             <td class="px-5 py-3 text-gray-600"><%= a.bank_name %></td>
             <td class="px-5 py-3 text-gray-600 font-mono text-xs"><%= a.account_number %></td>
+            <td class="px-5 py-3 text-right">
+              <% if (parseInt(a.payout_count) > 0) { %>
+                <span class="text-sm font-semibold text-gray-800"><%= parseInt(a.payout_count) %></span>
+                <span class="text-xs text-gray-400 block">MYR <%= parseFloat(a.payout_total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+              <% } else { %>
+                <span class="text-xs text-gray-400">—</span>
+              <% } %>
+            </td>
             <% if (user.role !== 'malaysia_admin') { %>
-              <td class="px-5 py-3 text-gray-600"><%= a.shopee_id || '-' %></td>
               <td class="px-5 py-3 text-gray-600"><%= a.phone || '-' %></td>
               <td class="px-5 py-3 text-center">
                 <span class="px-2.5 py-1 rounded-full text-xs font-medium <%= a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' %>">

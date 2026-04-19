@@ -42,12 +42,22 @@
     </div>
   </div>
 
-  <!-- Input Section -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <!-- Upload PDFs -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <p class="text-sm font-semibold text-gray-700 mb-1">Upload Shopee Invoices</p>
-      <p class="text-xs text-gray-400 mb-3">Upload PDF invoices. Auto-extracts & auto-links to affiliate accounts.</p>
+  <!-- Input Section (ISH admin + studio only) -->
+  <% if (isISHAdmin || isStudio) { %>
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+    <!-- Tab buttons -->
+    <div class="flex border-b border-gray-200">
+      <button onclick="showTab('upload')" id="tab-upload" class="flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition-colors">
+        📄 Upload Invoices
+      </button>
+      <button onclick="showTab('manual')" id="tab-manual" class="flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+        ✏️ Manual Entry
+      </button>
+    </div>
+
+    <!-- Upload tab -->
+    <div id="panel-upload" class="p-5">
+      <p class="text-xs text-gray-400 mb-3">Upload Shopee PDF invoices. Auto-extracts & auto-links to affiliate accounts.</p>
       <form method="POST" action="/shopee/payouts/upload" enctype="multipart/form-data" class="space-y-3">
         <% if (typeof studios !== 'undefined' && studios.length > 0) { %>
           <select name="studio_id" required
@@ -66,11 +76,9 @@
       </form>
     </div>
 
-    <!-- Manual Add (admin only) -->
-    <% if (isISHAdmin || isMYAdmin) { %>
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <p class="text-sm font-semibold text-gray-700 mb-1">Add Manually</p>
-      <p class="text-xs text-gray-400 mb-3">Select account holder and enter payout details.</p>
+    <!-- Manual tab -->
+    <div id="panel-manual" class="p-5 hidden">
+      <p class="text-xs text-gray-400 mb-3">Select account holder and enter payout details manually.</p>
       <form method="POST" action="/shopee/payouts/add" class="space-y-2">
         <select name="affiliate_account_id" required
           class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
@@ -94,8 +102,24 @@
         </button>
       </form>
     </div>
-    <% } %>
   </div>
+
+  <script>
+    function showTab(tab) {
+      document.getElementById('panel-upload').classList.toggle('hidden', tab !== 'upload');
+      document.getElementById('panel-manual').classList.toggle('hidden', tab !== 'manual');
+      const tabU = document.getElementById('tab-upload');
+      const tabM = document.getElementById('tab-manual');
+      if (tab === 'upload') {
+        tabU.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition-colors';
+        tabM.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
+      } else {
+        tabM.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-emerald-600 text-emerald-700 bg-emerald-50 transition-colors';
+        tabU.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
+      }
+    }
+  </script>
+  <% } %>
 
   <!-- Pipeline Legend -->
   <div class="flex items-center gap-2 text-xs text-gray-400 mb-3 flex-wrap">

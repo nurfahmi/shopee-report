@@ -3,8 +3,12 @@ const db = require('../config/database');
 const Affiliate = {
   async findAll() {
     const [rows] = await db.query(
-      `SELECT a.*, s.name AS studio_name FROM affiliate_accounts a
+      `SELECT a.*, s.name AS studio_name,
+              COALESCE(p.payout_count, 0) AS payout_count,
+              COALESCE(p.payout_total, 0) AS payout_total
+       FROM affiliate_accounts a
        LEFT JOIN studios s ON a.studio_id = s.id
+       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
        ORDER BY a.full_name`
     );
     return rows;
@@ -35,8 +39,12 @@ const Affiliate = {
 
   async findByStudio(studioId) {
     const [rows] = await db.query(
-      `SELECT a.*, s.name AS studio_name FROM affiliate_accounts a
+      `SELECT a.*, s.name AS studio_name,
+              COALESCE(p.payout_count, 0) AS payout_count,
+              COALESCE(p.payout_total, 0) AS payout_total
+       FROM affiliate_accounts a
        LEFT JOIN studios s ON a.studio_id = s.id
+       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
        WHERE a.studio_id=? ORDER BY a.full_name`, [studioId]);
     return rows;
   },
