@@ -170,8 +170,9 @@ const payoutController = {
     const user = req.session.user;
     const role = user.role;
 
-    // Permission matrix
+    // Permission matrix (forward + rollback)
     const allowed = {
+      'processing':   ['malaysia_admin', 'superadmin'],
       'collected':    ['malaysia_admin', 'superadmin'],
       'transferring': ['malaysia_admin', 'superadmin'],
       'received':     ['indonesia_admin', 'superadmin'],
@@ -179,8 +180,27 @@ const payoutController = {
       'completed':    ['studio', 'superadmin'],
     };
 
+    // Valid transitions (forward + rollback)
+    const validTransitions = {
+      'processing':   ['collected'],
+      'collected':    ['processing', 'transferring'],
+      'transferring': ['collected', 'received'],
+      'received':     ['transferring', 'distributed'],
+      'distributed':  ['received', 'completed'],
+      'completed':    ['distributed'],
+    };
+
     if (!allowed[status] || !allowed[status].includes(role)) {
       req.flash('error', `You don't have permission to set status to "${status}".`);
+      return res.redirect('/shopee/payouts');
+    }
+
+    // Check transition is valid
+    const entry = await PayoutEntry.findById(id);
+    if (!entry) { req.flash('error', 'Entry not found.'); return res.redirect('/shopee/payouts'); }
+    const currentValid = validTransitions[entry.payment_status] || [];
+    if (!currentValid.includes(status)) {
+      req.flash('error', `Cannot change from "${entry.payment_status}" to "${status}".`);
       return res.redirect('/shopee/payouts');
     }
 
