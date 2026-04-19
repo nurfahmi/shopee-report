@@ -1,12 +1,13 @@
 <%
   const s = payoutStats;
   const totalMYR = parseFloat(s.total_myr || 0);
+  const shopeeNet = totalMYR * (1 - 0.01 - 0.01 * 0.08);
   const genPct = deductions.general;
   const myPct = deductions.myAdmin;
   const idPct = deductions.idAdmin;
-  const afterMyAdmin = totalMYR * (1 - (genPct + myPct) / 100);
-  const idEarnings = totalMYR * idPct / 100;
-  const studioNet = totalMYR * (1 - (genPct + myPct + idPct) / 100);
+  const afterMyAdmin = shopeeNet * (1 - (genPct + myPct) / 100);
+  const idEarnings = shopeeNet * idPct / 100;
+  const studioNet = shopeeNet * (1 - (genPct + myPct + idPct) / 100);
 
   const colors = {
     processing:'bg-blue-100 text-blue-700',
@@ -69,7 +70,7 @@
   </div>
   <div class="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
     <p class="text-xs font-medium text-gray-500">Your Earnings</p>
-    <% const myEarnings = totalMYR * myPct / 100; %>
+    <% const myEarnings = shopeeNet * myPct / 100; %>
     <p class="text-2xl font-bold text-emerald-700 mt-2">MYR <%= myEarnings.toLocaleString('en-MY',{minimumFractionDigits:2}) %></p>
     <p class="text-xs text-emerald-500 font-medium mt-1">~IDR <%= Math.round(myEarnings * rate).toLocaleString('id-ID') %></p>
     <p class="text-xs text-gray-400">From all invoices</p>

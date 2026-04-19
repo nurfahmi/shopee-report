@@ -57,11 +57,11 @@
           const shopeeServiceFee = amt * 0.01;
           const shopeeSSTFee = shopeeServiceFee * 0.08;
           const netAfterShopee = amt - shopeeServiceFee - shopeeSSTFee;
-          const genDed = amt * deductions.general / 100;
-          const myDed = amt * deductions.myAdmin / 100;
-          const idDed = amt * deductions.idAdmin / 100;
-          const afterMyAdmin = amt - genDed - myDed;
-          const studioNet = amt - genDed - myDed - idDed;
+          const genDed = netAfterShopee * deductions.general / 100;
+          const myDed = netAfterShopee * deductions.myAdmin / 100;
+          const idDed = netAfterShopee * deductions.idAdmin / 100;
+          const afterMyAdmin = netAfterShopee - genDed - myDed;
+          const studioNet = netAfterShopee - genDed - myDed - idDed;
         %>
 
         <!-- Invoice Amount (all roles) -->

@@ -55,7 +55,8 @@
             <% let grandTotal = 0; let grandTransfer = 0; %>
             <% entries.forEach(e => {
               const eAmt = parseFloat(e.payout_amount);
-              const eTransfer = eAmt * (1 - (genPct + myPct) / 100);
+              const eNet = eAmt * (1 - 0.01 - 0.01 * 0.08);
+              const eTransfer = eNet * (1 - (genPct + myPct) / 100);
               grandTotal += eAmt;
               grandTransfer += eTransfer;
             %>

@@ -127,11 +127,12 @@
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600">Invoice</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Net</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600">
                 <% if (user.role === 'malaysia_admin') { %>Transfer
                 <% } else if (user.role === 'indonesia_admin') { %>Earnings
                 <% } else if (user.role === 'studio') { %>Net Payout
-                <% } else { %>Net
+                <% } else { %>Studio Net
                 <% } %>
               </th>
               <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
@@ -186,13 +187,15 @@
                 <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
                 <%
                   const amt = parseFloat(e.payout_amount);
-                  const genDed = amt * deductions.general / 100;
-                  const myDed = amt * deductions.myAdmin / 100;
-                  const idDed = amt * deductions.idAdmin / 100;
-                  const afterMyAdmin = amt - genDed - myDed; // what MY admin transfers
-                  const idEarnings = idDed; // ID admin's earnings
-                  const studioNet = amt - genDed - myDed - idDed; // what studio gets
+                  const netAmt = amt * (1 - 0.01 - 0.01 * 0.08);
+                  const genDed = netAmt * deductions.general / 100;
+                  const myDed = netAmt * deductions.myAdmin / 100;
+                  const idDed = netAmt * deductions.idAdmin / 100;
+                  const afterMyAdmin = netAmt - genDed - myDed;
+                  const idEarnings = idDed;
+                  const studioNet = netAmt - genDed - myDed - idDed;
                 %>
+                <td class="px-4 py-3 text-right font-semibold text-gray-600"><%= netAmt.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
                 <td class="px-4 py-3 text-right">
                   <% if (user.role === 'malaysia_admin') { %>
                     <span class="font-semibold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2}) %></span>
