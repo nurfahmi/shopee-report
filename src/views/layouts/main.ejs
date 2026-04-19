@@ -21,13 +21,19 @@
   </script>
   <style>
     [x-cloak] { display: none !important; }
+    @media (max-width: 767px) {
+      .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 25; }
+    }
   </style>
 </head>
 <body class="h-full bg-gray-50 font-sans">
   <div class="flex h-full">
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay hidden md:hidden" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
     <!-- Sidebar -->
-    <aside class="w-64 bg-gray-900 text-white flex flex-col min-h-screen fixed inset-y-0 left-0 z-30">
-      <div class="p-5 border-b border-gray-700">
+    <aside id="sidebar" class="w-64 bg-gray-900 text-white flex flex-col min-h-screen fixed inset-y-0 left-0 z-30 transition-transform duration-200 -translate-x-full md:translate-x-0">
+      <div class="p-5 border-b border-gray-700 flex items-center justify-between">
         <div class="flex items-center gap-3">
           <img src="/images/logo.png" alt="Shopee Report" class="w-9 h-9 rounded-lg">
           <div>
@@ -35,6 +41,9 @@
             <p class="text-xs text-gray-400 mt-0.5">Indosofthouse</p>
           </div>
         </div>
+        <button class="md:hidden text-gray-400 hover:text-white" onclick="toggleSidebar()">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
       </div>
       <nav class="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         <a href="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-gray-800 transition-colors">
@@ -74,14 +83,14 @@
       <!-- User info at bottom -->
       <div class="p-4 border-t border-gray-700">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-sm font-bold">
+          <div class="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
             <%= user?.name?.[0] || 'U' %>
           </div>
           <a href="/auth/change-password" class="flex-1 min-w-0 hover:opacity-80 transition-opacity">
             <p class="text-sm font-medium truncate"><%= user?.name %></p>
             <p class="text-xs text-gray-400 capitalize"><%= user?.role?.replace('_', ' ') %></p>
           </a>
-          <a href="/auth/logout" class="text-gray-400 hover:text-red-400 transition-colors" title="Logout">
+          <a href="/auth/logout" class="text-gray-400 hover:text-red-400 transition-colors flex-shrink-0" title="Logout">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
           </a>
         </div>
@@ -89,26 +98,37 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 ml-64 min-h-screen">
+    <main class="flex-1 md:ml-64 min-h-screen w-full">
+      <!-- Mobile top bar -->
+      <div class="md:hidden bg-gray-900 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20">
+        <button onclick="toggleSidebar()" class="text-gray-300 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="font-semibold text-brand-400 text-sm">Shopee Report</span>
+        <a href="/auth/logout" class="text-gray-400 hover:text-red-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </a>
+      </div>
+
       <% if (typeof isImpersonating !== 'undefined' && isImpersonating) { %>
         <div class="bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-between text-sm font-medium">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
             Viewing as <strong class="ml-1"><%= user?.name %></strong> (<%= user?.role?.replace('_',' ') %>)
           </div>
-          <a href="/auth/stop-impersonate" class="bg-amber-800 hover:bg-amber-700 text-white px-3 py-1 rounded text-xs font-semibold transition-colors">← Back to my account</a>
+          <a href="/auth/stop-impersonate" class="bg-amber-800 hover:bg-amber-700 text-white px-3 py-1 rounded text-xs font-semibold transition-colors">← Back</a>
         </div>
       <% } %>
-      <div class="p-6 lg:p-8 max-w-7xl">
+      <div class="p-4 sm:p-6 lg:p-8 max-w-7xl">
         <!-- Flash Messages -->
         <% if (typeof flash_success !== 'undefined' && flash_success.length) { %>
-          <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
             <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
             <%= flash_success %>
           </div>
         <% } %>
         <% if (typeof flash_error !== 'undefined' && flash_error.length) { %>
-          <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
             <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
             <%= flash_error %>
           </div>
@@ -118,5 +138,20 @@
       </div>
     </main>
   </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.toggle('-translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+    // Close sidebar on nav link click (mobile)
+    document.querySelectorAll('#sidebar a[href]').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 768) toggleSidebar();
+      });
+    });
+  </script>
 </body>
 </html>

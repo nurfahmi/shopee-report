@@ -8,26 +8,28 @@
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     </a>
     <div>
-      <h1 class="text-2xl font-bold text-gray-800">Bulk Transfer to Indonesia</h1>
-      <p class="text-gray-500 text-sm">Select collected payouts and transfer them in one batch</p>
+      <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Bulk Transfer</h1>
+      <p class="text-gray-500 text-sm">Select collected payouts and transfer in one batch</p>
     </div>
   </div>
 
   <!-- Date Filter -->
-  <form method="GET" action="/shopee/payouts/transfer" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
-    <div class="flex items-end gap-4">
-      <div>
+  <form method="GET" action="/shopee/payouts/transfer" class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+      <div class="flex-1">
         <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
-        <input type="date" name="from" value="<%= query.from || '' %>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        <input type="date" name="from" value="<%= query.from || '' %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
       </div>
-      <div>
+      <div class="flex-1">
         <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
-        <input type="date" name="to" value="<%= query.to || '' %>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+        <input type="date" name="to" value="<%= query.to || '' %>" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
       </div>
-      <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">Filter</button>
-      <% if (query.from || query.to) { %>
-        <a href="/shopee/payouts/transfer" class="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm">Clear</a>
-      <% } %>
+      <div class="flex gap-2">
+        <button type="submit" class="flex-1 sm:flex-none px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">Filter</button>
+        <% if (query.from || query.to) { %>
+          <a href="/shopee/payouts/transfer" class="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm">Clear</a>
+        <% } %>
+      </div>
     </div>
   </form>
 
