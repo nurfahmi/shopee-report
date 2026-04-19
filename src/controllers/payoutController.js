@@ -26,9 +26,11 @@ const payoutController = {
     const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
     const rate = await getRate();
     const deductions = await getDeductions();
+    const Studio = require('../models/Studio');
+    const studios = ['superadmin','indonesia_admin'].includes(user.role) ? await Studio.findAll() : [];
     res.render('shopee/payouts/index', {
       title: 'Shopee Payouts',
-      entries, stats, affiliates, rate, deductions, user
+      entries, stats, affiliates, rate, deductions, studios, user
     });
   },
 
@@ -41,7 +43,7 @@ const payoutController = {
     }
 
     const user = req.session.user;
-    const studioId = user.role === 'studio' ? user.studio_id : null;
+    const studioId = ['superadmin','indonesia_admin'].includes(user.role) ? (req.body.studio_id || null) : (user.role === 'studio' ? user.studio_id : null);
     const rate = await getRate();
     const results = await extractMultiplePayouts(files.map(f => f.path));
     let added = 0;
