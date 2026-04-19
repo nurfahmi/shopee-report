@@ -240,6 +240,57 @@ const payoutController = {
     res.redirect('/shopee/payouts');
   },
 
+  // ── Bulk Transfer ──────────────────────────────────────────────
+  async getTransfer(req, res) {
+    const { from, to } = req.query;
+    const db = require('../config/database');
+    let where = `pe.payment_status = 'collected'`;
+    const params = [];
+    if (from) { where += ' AND pe.invoice_date >= ?'; params.push(from); }
+    if (to)   { where += ' AND pe.invoice_date <= ?'; params.push(to); }
+
+    const [entries] = await db.query(`
+      SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number
+      FROM payout_entries pe
+      LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+      WHERE ${where}
+      ORDER BY pe.invoice_date ASC, pe.created_at ASC
+    `, params);
+
+    const deductions = await getDeductions();
+    const rate = await getRate();
+    res.render('shopee/payouts/transfer', {
+      title: 'Bulk Transfer',
+      entries, deductions, rate, query: req.query, user: req.session.user
+    });
+  },
+
+  async postBulkTransfer(req, res) {
+    let { entry_ids } = req.body;
+    if (!entry_ids) {
+      req.flash('error', 'No payouts selected.');
+      return res.redirect('/shopee/payouts/transfer');
+    }
+    if (!Array.isArray(entry_ids)) entry_ids = [entry_ids];
+    if (!req.file) {
+      req.flash('error', 'Transfer proof is required.');
+      return res.redirect('/shopee/payouts/transfer');
+    }
+    const proofPath = `/uploads/proofs/${req.file.filename}`;
+    const db = require('../config/database');
+    const ids = entry_ids.map(Number).filter(Boolean);
+    if (ids.length === 0) {
+      req.flash('error', 'No valid payouts selected.');
+      return res.redirect('/shopee/payouts/transfer');
+    }
+    await db.query(
+      `UPDATE payout_entries SET payment_status='transferring', transfer_proof_path=? WHERE id IN (${ids.map(()=>'?').join(',')}) AND payment_status='collected'`,
+      [proofPath, ...ids]
+    );
+    req.flash('success', `${ids.length} payout(s) marked as transferring.`);
+    res.redirect('/shopee/payouts');
+  },
+
   // ── Currency converter ──────────────────────────────────────────
   async getConverter(req, res) {
     const rate = await getRate();

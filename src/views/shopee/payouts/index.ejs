@@ -1,5 +1,13 @@
 <div class="max-w-6xl">
-  <h1 class="text-2xl font-bold text-gray-800 mb-1">Shopee Payouts</h1>
+  <div class="flex items-center justify-between mb-1">
+    <h1 class="text-2xl font-bold text-gray-800">Shopee Payouts</h1>
+    <% if (user.role === 'malaysia_admin' || user.role === 'superadmin') { %>
+      <a href="/shopee/payouts/transfer" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        Bulk Transfer
+      </a>
+    <% } %>
+  </div>
   <p class="text-gray-500 text-sm mb-6">Track affiliate payouts from Shopee. Upload invoices or add manually.</p>
 
   <!-- Stats -->

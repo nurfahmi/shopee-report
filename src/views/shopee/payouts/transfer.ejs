@@ -1,0 +1,107 @@
+<%
+  const genPct = deductions.general;
+  const myPct = deductions.myAdmin;
+%>
+<div class="max-w-5xl">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/shopee/payouts" class="text-gray-400 hover:text-gray-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Bulk Transfer to Indonesia</h1>
+      <p class="text-gray-500 text-sm">Select collected payouts and transfer them in one batch</p>
+    </div>
+  </div>
+
+  <!-- Date Filter -->
+  <form method="GET" action="/shopee/payouts/transfer" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+    <div class="flex items-end gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+        <input type="date" name="from" value="<%= query.from || '' %>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+        <input type="date" name="to" value="<%= query.to || '' %>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+      <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">Filter</button>
+      <% if (query.from || query.to) { %>
+        <a href="/shopee/payouts/transfer" class="px-4 py-2 text-gray-500 hover:text-gray-700 text-sm">Clear</a>
+      <% } %>
+    </div>
+  </form>
+
+  <% if (entries.length === 0) { %>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center">
+      <p class="text-gray-400">No collected payouts found<%= (query.from || query.to) ? ' for this date range' : '' %>.</p>
+    </div>
+  <% } else { %>
+    <form method="POST" action="/shopee/payouts/transfer" enctype="multipart/form-data" id="bulkTransferForm">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 text-left">
+                <input type="checkbox" id="selectAll" class="rounded">
+              </th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Invoice</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Amount (MYR)</th>
+              <th class="text-right px-4 py-3 font-semibold text-gray-600">Transfer (MYR)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <% let grandTotal = 0; let grandTransfer = 0; %>
+            <% entries.forEach(e => {
+              const eAmt = parseFloat(e.payout_amount);
+              const eTransfer = eAmt * (1 - (genPct + myPct) / 100);
+              grandTotal += eAmt;
+              grandTransfer += eTransfer;
+            %>
+              <tr class="hover:bg-gray-50 transition-colors entry-row">
+                <td class="px-4 py-3">
+                  <input type="checkbox" name="entry_ids" value="<%= e.id %>" class="entry-check rounded">
+                </td>
+                <td class="px-4 py-3 font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></td>
+                <td class="px-4 py-3 text-gray-600 font-mono text-xs"><%= e.invoice_number || '-' %></td>
+                <td class="px-4 py-3 text-gray-600"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
+                <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= eAmt.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+                <td class="px-4 py-3 text-right font-semibold text-indigo-700"><%= eTransfer.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot class="bg-gray-50 border-t border-gray-200">
+            <tr>
+              <td colspan="4" class="px-4 py-3 font-semibold text-gray-700">Total (<span id="selectedCount"><%= entries.length %></span> selected)</td>
+              <td class="px-4 py-3 text-right font-bold text-gray-800" id="totalAmount"><%= grandTotal.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+              <td class="px-4 py-3 text-right font-bold text-indigo-700" id="totalTransfer"><%= grandTransfer.toLocaleString('en-MY',{minimumFractionDigits:2}) %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Upload proof + submit -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <p class="text-sm font-semibold text-gray-700 mb-3">Transfer Proof</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">Upload transfer proof (screenshot/receipt)</label>
+            <input type="file" name="proof" accept="image/*,.pdf" required
+              class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 file:rounded-lg file:cursor-pointer">
+          </div>
+          <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors"
+            onclick="return confirm('Transfer selected payouts? This will mark them as transferring.')">
+            Mark Selected as Transferring
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <script>
+      document.getElementById('selectAll').addEventListener('change', function() {
+        document.querySelectorAll('.entry-check').forEach(cb => cb.checked = this.checked);
+      });
+    </script>
+  <% } %>
+</div>
