@@ -51,6 +51,7 @@
               <% if (parseInt(a.payout_count) > 0) { %>
                 <span class="text-sm font-semibold text-gray-800"><%= parseInt(a.payout_count) %></span>
                 <span class="text-xs text-gray-400 block">MYR <%= parseFloat(a.payout_total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                <span class="text-xs text-gray-300 block">~IDR <%= Math.round(parseFloat(a.payout_total) * rate).toLocaleString('id-ID') %></span>
               <% } else { %>
                 <span class="text-xs text-gray-400">—</span>
               <% } %>

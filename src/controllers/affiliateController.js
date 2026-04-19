@@ -1,5 +1,6 @@
 const Affiliate = require('../models/Affiliate');
 const Studio = require('../models/Studio');
+const Setting = require('../models/Setting');
 const { extractBankStatement } = require('../services/ocrService');
 
 const affiliateController = {
@@ -8,7 +9,8 @@ const affiliateController = {
     const studioId = user.role === 'studio' ? user.studio_id : null;
     const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
     const studios = await Studio.findAll();
-    res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, studios, user });
+    const rate = parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
+    res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, studios, rate, user });
   },
 
   async postUploadStatement(req, res) {

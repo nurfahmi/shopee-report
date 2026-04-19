@@ -67,16 +67,28 @@
                 <td class="px-4 py-3 font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></td>
                 <td class="px-4 py-3 text-gray-600 font-mono text-xs"><%= e.invoice_number || '-' %></td>
                 <td class="px-4 py-3 text-gray-600"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
-                <td class="px-4 py-3 text-right font-semibold text-gray-800"><%= eAmt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
-                <td class="px-4 py-3 text-right font-semibold text-indigo-700"><%= eTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
+                <td class="px-4 py-3 text-right">
+                  <span class="font-semibold text-gray-800"><%= eAmt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                  <span class="text-xs text-gray-300 block">~IDR <%= Math.round(eAmt * rate).toLocaleString('id-ID') %></span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <span class="font-semibold text-indigo-700"><%= eTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                  <span class="text-xs text-indigo-400 block">~IDR <%= Math.round(eTransfer * rate).toLocaleString('id-ID') %></span>
+                </td>
               </tr>
             <% }) %>
           </tbody>
           <tfoot class="bg-gray-50 border-t border-gray-200">
             <tr>
               <td colspan="4" class="px-4 py-3 font-semibold text-gray-700">Total (<span id="selectedCount"><%= entries.length %></span> selected)</td>
-              <td class="px-4 py-3 text-right font-bold text-gray-800" id="totalAmount"><%= grandTotal.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
-              <td class="px-4 py-3 text-right font-bold text-indigo-700" id="totalTransfer"><%= grandTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
+              <td class="px-4 py-3 text-right">
+                <span class="font-bold text-gray-800" id="totalAmount"><%= grandTotal.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                <span class="text-xs text-gray-400 block">~IDR <%= Math.round(grandTotal * rate).toLocaleString('id-ID') %></span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <span class="font-bold text-indigo-700" id="totalTransfer"><%= grandTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                <span class="text-xs text-indigo-400 block">~IDR <%= Math.round(grandTransfer * rate).toLocaleString('id-ID') %></span>
+              </td>
             </tr>
           </tfoot>
         </table>
