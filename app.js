@@ -74,6 +74,7 @@ app.use('/settings',          require('./src/routes/settings'));
 app.use('/shopee/affiliates', require('./src/routes/affiliates'));
 app.use('/shopee/payouts',    require('./src/routes/payouts'));
 app.use('/studios',           require('./src/routes/studios'));
+app.use('/finance',           require('./src/routes/finance'));
 
 // ── 404 ───────────────────────────────────────────────────────────
 app.use((req, res) => {

@@ -207,6 +207,64 @@ async function syncDatabase() {
       created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (invoice_id)   REFERENCES invoices(id) ON DELETE CASCADE,
       FOREIGN KEY (milestone_id) REFERENCES invoice_milestones(id)
+    )`,
+
+    // ── Finance module: staff payroll + monthly expenses (ID admin / SA only) ──
+    // All amounts are in IDR. Staff are either hourly (rate × hours) or fixed
+    // (monthly salary). Daily lunch cashback is optional and applies to days_worked.
+    `CREATE TABLE IF NOT EXISTS finance_staff (
+      id                          INT AUTO_INCREMENT PRIMARY KEY,
+      name                        VARCHAR(150) NOT NULL,
+      role_title                  VARCHAR(150) NULL,
+      salary_type                 ENUM('hourly','fixed') NOT NULL DEFAULT 'hourly',
+      hourly_rate_idr             DECIMAL(15,2) NULL,
+      monthly_salary_idr          DECIMAL(15,2) NULL,
+      lunch_cashback_per_day_idr  DECIMAL(12,2) NULL,
+      notes                       TEXT NULL,
+      is_active                   TINYINT(1) NOT NULL DEFAULT 1,
+      created_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS finance_periods (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      year        INT NOT NULL,
+      month       TINYINT NOT NULL,
+      notes       TEXT NULL,
+      status      ENUM('draft','final') NOT NULL DEFAULT 'draft',
+      created_by  INT NULL,
+      created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_finance_year_month (year, month)
+    )`,
+    `CREATE TABLE IF NOT EXISTS finance_staff_payouts (
+      id                            INT AUTO_INCREMENT PRIMARY KEY,
+      finance_period_id             INT NOT NULL,
+      staff_id                      INT NOT NULL,
+      hours_worked                  DECIMAL(8,2) NOT NULL DEFAULT 0,
+      days_worked                   INT NOT NULL DEFAULT 0,
+      salary_type_snapshot          ENUM('hourly','fixed') NOT NULL DEFAULT 'hourly',
+      hourly_rate_snapshot_idr      DECIMAL(15,2) NULL,
+      monthly_salary_snapshot_idr   DECIMAL(15,2) NULL,
+      lunch_cashback_snapshot_idr   DECIMAL(12,2) NULL,
+      calculated_amount_idr         DECIMAL(15,2) NOT NULL DEFAULT 0,
+      notes                         TEXT NULL,
+      created_at                    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at                    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_period_staff (finance_period_id, staff_id),
+      FOREIGN KEY (finance_period_id) REFERENCES finance_periods(id) ON DELETE CASCADE,
+      FOREIGN KEY (staff_id)          REFERENCES finance_staff(id)   ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS finance_expenses (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      finance_period_id INT NOT NULL,
+      category          VARCHAR(100) NOT NULL,
+      description       VARCHAR(500) NULL,
+      amount_idr        DECIMAL(15,2) NOT NULL DEFAULT 0,
+      expense_date      DATE NULL,
+      notes             TEXT NULL,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (finance_period_id) REFERENCES finance_periods(id) ON DELETE CASCADE
     )`
   ];
 
