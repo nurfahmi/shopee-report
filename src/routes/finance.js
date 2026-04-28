@@ -10,16 +10,19 @@ router.use(requireAuth, requireISHAdmin);
 router.get('/', financeController.index);
 
 // ── Per-studio routes (scoped under :studioId) ──
-// Note: month route uses regex constraints so it doesn't shadow /staff or /period.
-router.get('/:studioId(\\d+)',                                                  financeController.getStudio);
-router.get('/:studioId(\\d+)/staff',                                            financeController.getStaff);
-router.post('/:studioId(\\d+)/staff',                                           financeController.postStaffCreate);
-router.post('/:studioId(\\d+)/staff/:id(\\d+)',                                 financeController.postStaffUpdate);
-router.post('/:studioId(\\d+)/staff/:id(\\d+)/delete',                          financeController.postStaffDelete);
-router.post('/:studioId(\\d+)/period/create',                                   financeController.postPeriodCreate);
-router.get('/:studioId(\\d+)/:year(\\d{4})/:month(\\d{2})',                     financeController.getPeriod);
-router.post('/:studioId(\\d+)/:year(\\d{4})/:month(\\d{2})/payout',             financeController.postPayoutUpsert);
-router.post('/:studioId(\\d+)/:year(\\d{4})/:month(\\d{2})/expense',            financeController.postExpenseCreate);
-router.post('/:studioId(\\d+)/:year(\\d{4})/:month(\\d{2})/expense/:id(\\d+)/delete', financeController.postExpenseDelete);
+// More-specific literal paths are declared BEFORE the generic month route so
+// Express picks them first. Param validation (parseInt + range checks) happens
+// inside the controllers — we don't rely on inline regex constraints because
+// path-to-regexp v8+ (Express 5) dropped support for them.
+router.get('/:studioId/staff',                                          financeController.getStaff);
+router.post('/:studioId/staff',                                         financeController.postStaffCreate);
+router.post('/:studioId/staff/:id',                                     financeController.postStaffUpdate);
+router.post('/:studioId/staff/:id/delete',                              financeController.postStaffDelete);
+router.post('/:studioId/period/create',                                 financeController.postPeriodCreate);
+router.post('/:studioId/:year/:month/payout',                           financeController.postPayoutUpsert);
+router.post('/:studioId/:year/:month/expense',                          financeController.postExpenseCreate);
+router.post('/:studioId/:year/:month/expense/:id/delete',               financeController.postExpenseDelete);
+router.get('/:studioId/:year/:month',                                   financeController.getPeriod);
+router.get('/:studioId',                                                financeController.getStudio);
 
 module.exports = router;
