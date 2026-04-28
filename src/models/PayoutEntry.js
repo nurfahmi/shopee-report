@@ -27,10 +27,14 @@ const PayoutEntry = {
   async findById(id) {
     const [rows] = await db.query(
       `SELECT pe.*, a.full_name AS affiliate_name, a.bank_name, a.account_number, a.studio_id,
-              s.name AS studio_name
+              s.name AS studio_name,
+              uc.name  AS created_by_name,
+              ucl.name AS collected_by_name
        FROM payout_entries pe
        LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
-       LEFT JOIN studios s ON a.studio_id = s.id
+       LEFT JOIN studios s            ON a.studio_id = s.id
+       LEFT JOIN users uc             ON pe.created_by   = uc.id
+       LEFT JOIN users ucl            ON pe.collected_by = ucl.id
        WHERE pe.id=?`, [id]);
     return rows[0] || null;
   },
@@ -85,13 +89,22 @@ const PayoutEntry = {
         COALESCE(SUM(pe.payout_amount_idr), 0) AS total_idr,
         SUM(CASE WHEN pe.payment_status='processing' THEN 1 ELSE 0 END) AS processing_count,
         COALESCE(SUM(CASE WHEN pe.payment_status='processing' THEN pe.payout_amount ELSE 0 END), 0) AS processing_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='processing' THEN pe.payout_amount_idr ELSE 0 END), 0) AS processing_idr,
         SUM(CASE WHEN pe.payment_status='collected' THEN 1 ELSE 0 END) AS collected_count,
         COALESCE(SUM(CASE WHEN pe.payment_status='collected' THEN pe.payout_amount ELSE 0 END), 0) AS collected_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='collected' THEN pe.payout_amount_idr ELSE 0 END), 0) AS collected_idr,
         SUM(CASE WHEN pe.payment_status='transferring' THEN 1 ELSE 0 END) AS transferring_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='transferring' THEN pe.payout_amount ELSE 0 END), 0) AS transferring_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='transferring' THEN pe.payout_amount_idr ELSE 0 END), 0) AS transferring_idr,
         SUM(CASE WHEN pe.payment_status='received' THEN 1 ELSE 0 END) AS received_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='received' THEN pe.payout_amount ELSE 0 END), 0) AS received_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='received' THEN pe.payout_amount_idr ELSE 0 END), 0) AS received_idr,
         SUM(CASE WHEN pe.payment_status='distributed' THEN 1 ELSE 0 END) AS distributed_count,
+        COALESCE(SUM(CASE WHEN pe.payment_status='distributed' THEN pe.payout_amount ELSE 0 END), 0) AS distributed_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='distributed' THEN pe.payout_amount_idr ELSE 0 END), 0) AS distributed_idr,
         SUM(CASE WHEN pe.payment_status='completed' THEN 1 ELSE 0 END) AS completed_count,
-        COALESCE(SUM(CASE WHEN pe.payment_status='completed' THEN pe.payout_amount ELSE 0 END), 0) AS completed_myr
+        COALESCE(SUM(CASE WHEN pe.payment_status='completed' THEN pe.payout_amount ELSE 0 END), 0) AS completed_myr,
+        COALESCE(SUM(CASE WHEN pe.payment_status='completed' THEN pe.payout_amount_idr ELSE 0 END), 0) AS completed_idr
       FROM payout_entries pe
       ${join}
       ${where}

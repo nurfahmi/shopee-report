@@ -233,6 +233,14 @@ async function syncDatabase() {
   await addColumnIfMissing(connection, 'payout_entries', 'payout_amount_idr', 'DECIMAL(15,2) NOT NULL DEFAULT 0 AFTER tax_amount');
   await addColumnIfMissing(connection, 'payout_entries', 'created_by', 'INT NULL AFTER sort_order');
 
+  // ── Actual-amount tracking (role-grouped UX redesign) ───────────
+  await addColumnIfMissing(connection, 'payout_entries', 'actual_collected_myr',  'DECIMAL(12,2) NULL AFTER payout_amount_idr');
+  await addColumnIfMissing(connection, 'payout_entries', 'actual_distributed_idr', 'DECIMAL(15,2) NULL AFTER actual_collected_myr');
+  await addColumnIfMissing(connection, 'payout_entries', 'actual_fx_rate',         'DECIMAL(12,6) NULL AFTER actual_distributed_idr');
+  // What actually reached ID admin per entry (sum across batch may differ from expected).
+  // Allocated proportionally from the bulk transfer's actual MYR total.
+  await addColumnIfMissing(connection, 'payout_entries', 'actual_received_myr',    'DECIMAL(12,2) NULL AFTER actual_fx_rate');
+
   // Make payout_period_id nullable (was NOT NULL in old schema)
   try { await connection.query('ALTER TABLE payout_entries MODIFY COLUMN payout_period_id INT NULL'); } catch(e) {}
 
@@ -245,6 +253,11 @@ async function syncDatabase() {
 
   // Add studio_id to affiliate_accounts
   await addColumnIfMissing(connection, 'affiliate_accounts', 'studio_id', 'INT NULL AFTER id');
+
+  // Studio bank details (so ID admin can transfer to each studio without leaving the app)
+  await addColumnIfMissing(connection, 'studios', 'bank_name',           'VARCHAR(150) NULL AFTER name');
+  await addColumnIfMissing(connection, 'studios', 'bank_account_holder', 'VARCHAR(200) NULL AFTER bank_name');
+  await addColumnIfMissing(connection, 'studios', 'bank_account_number', 'VARCHAR(100) NULL AFTER bank_account_holder');
 
   // Expand role ENUM to include new roles
   try {

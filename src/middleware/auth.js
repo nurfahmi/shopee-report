@@ -50,7 +50,23 @@ function attachLocals(req, res, next) {
   res.locals.isMYAdmin       = user?.role === 'malaysia_admin';
   res.locals.isStudio        = user?.role === 'studio';
   res.locals.studioId        = user?.studio_id || null;
+  res.locals.relativeTime    = relativeTime;
   next();
+}
+
+function relativeTime(input) {
+  if (!input) return '';
+  const then = new Date(input).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  const abs = Math.abs(diffSec);
+  const suffix = diffSec >= 0 ? 'ago' : 'from now';
+  if (abs < 60)        return `just now`;
+  if (abs < 3600)      return `${Math.round(abs / 60)} min ${suffix}`;
+  if (abs < 86400)     return `${Math.round(abs / 3600)} hr ${suffix}`;
+  if (abs < 86400 * 30)return `${Math.round(abs / 86400)} d ${suffix}`;
+  if (abs < 86400 * 365) return `${Math.round(abs / 86400 / 30)} mo ${suffix}`;
+  return `${Math.round(abs / 86400 / 365)} yr ${suffix}`;
 }
 
 module.exports = { requireAuth, requireRole, requireSuperAdmin, requireISHAdmin, requireAnyAdmin, requireStudioOrUp, attachLocals };

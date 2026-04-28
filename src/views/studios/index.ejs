@@ -1,39 +1,153 @@
-<div class="flex items-center justify-between mb-6">
-  <div>
-    <h1 class="text-2xl font-bold text-gray-800">Studios</h1>
-    <p class="text-gray-500 text-sm mt-1">Manage Shopee affiliate studios</p>
-  </div>
-  <a href="/studios/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-    Add Studio
-  </a>
-</div>
+<%
+  // Floor IDR to nearest 100 — Indonesian banks don't transfer fractional rupiahs.
+  const fmtIDR = n => (Math.floor(Math.max(0, parseFloat(n||0)) / 100) * 100).toLocaleString('id-ID');
+  const fmtMYR = n => parseFloat(n||0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+%>
 
-<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-  <table class="w-full text-sm">
-    <thead class="bg-gray-50 border-b border-gray-200">
-      <tr>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Studio Name</th>
-        <th class="text-left px-5 py-3 font-semibold text-gray-600">Created</th>
-        <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-100">
-      <% if (!studios.length) { %>
-        <tr><td colspan="3" class="px-5 py-8 text-center text-gray-400">No studios yet.</td></tr>
-      <% } %>
-      <% studios.forEach(s => { %>
-        <tr class="hover:bg-gray-50">
-          <td class="px-5 py-3 font-medium text-gray-800"><%= s.name %></td>
-          <td class="px-5 py-3 text-gray-500"><%= new Date(s.created_at).toLocaleDateString('en-GB') %></td>
-          <td class="px-5 py-3 text-right space-x-2">
-            <a href="/studios/<%= s.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
-            <form method="POST" action="/studios/<%= s.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
-              <button class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
-            </form>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+<div class="max-w-6xl">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Studios</h1>
+      <p class="text-slate-500 text-sm mt-1"><%= studios.length %> studio<%= studios.length === 1 ? '' : 's' %> · <span class="tabular-nums"><%= totals.affiliates %></span> affiliate accounts</p>
+    </div>
+    <a href="/studios/create" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-semibold tracking-wide uppercase shadow-sm transition whitespace-nowrap">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      Add Studio
+    </a>
+  </div>
+
+  <!-- Hero KPIs -->
+  <% if (studios.length > 0) { %>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Affiliates</p>
+        <p class="text-xl font-bold text-slate-900 mt-1.5 tabular-nums"><%= totals.affiliates %></p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Studio Users</p>
+        <p class="text-xl font-bold text-slate-900 mt-1.5 tabular-nums"><%= totals.users %></p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Payouts</p>
+        <p class="text-xl font-bold text-slate-900 mt-1.5 tabular-nums"><%= totals.payouts %></p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4">
+        <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Paid Out</p>
+        <p class="text-xl font-bold text-emerald-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.paidIdr) %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Settlement table -->
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-[13px]">
+        <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+          <tr>
+            <th class="text-left  px-3 py-2.5 font-semibold">Studio</th>
+            <th class="text-right px-2 py-2.5 font-semibold">Affiliates</th>
+            <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">Users</th>
+            <th class="text-right px-2 py-2.5 font-semibold">Invoices</th>
+            <th class="text-right px-2 py-2.5 font-semibold hidden md:table-cell">Pending</th>
+            <th class="text-right px-2 py-2.5 font-semibold">Total Paid</th>
+            <th class="text-left  px-2 py-2.5 font-semibold hidden lg:table-cell">Last Activity</th>
+            <th class="px-2 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <% if (!studios.length) { %>
+            <tr><td colspan="8" class="px-5 py-10 text-center text-slate-400 text-sm">No studios yet.</td></tr>
+          <% } %>
+          <% studios.forEach(s => {
+               const affCount = parseInt(s.affiliate_count || 0);
+               const userCount = parseInt(s.user_count || 0);
+               const payCount = parseInt(s.payout_count || 0);
+               const paidIdr = parseFloat(s.paid_idr || 0);
+               const pendingMyr = parseFloat(s.pending_myr || 0);
+               const created = new Date(s.created_at);
+               const cd = String(created.getDate()).padStart(2,'0');
+               const cm = String(created.getMonth()+1).padStart(2,'0');
+          %>
+            <tr class="hover:bg-slate-50/60 transition-colors">
+              <td class="px-3 py-2.5 align-top">
+                <p class="font-semibold text-slate-900 leading-tight"><%= s.name %></p>
+                <% const hasBank = s.bank_name || s.bank_account_number; %>
+                <% if (hasBank) { %>
+                  <p class="text-[10px] text-slate-500 mt-0.5">
+                    <%= s.bank_name || '' %><% if (s.bank_account_number) { %><% if (s.bank_name) { %> · <% } %><span class="font-mono tabular-nums"><%= s.bank_account_number %></span><% } %>
+                  </p>
+                <% } else { %>
+                  <p class="text-[10px] text-amber-600 mt-0.5">⚠ No bank details</p>
+                <% } %>
+                <p class="text-[10px] text-slate-400 mt-0.5 tabular-nums">Created <%= cd %>/<%= cm %>/<%= created.getFullYear() %></p>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right">
+                <% if (affCount > 0) { %>
+                  <span class="font-medium text-slate-700 tabular-nums"><%= affCount %></span>
+                <% } else { %>
+                  <span class="text-slate-300 tabular-nums">0</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right hidden sm:table-cell">
+                <% if (userCount > 0) { %>
+                  <span class="font-medium text-slate-700 tabular-nums"><%= userCount %></span>
+                <% } else { %>
+                  <span class="text-slate-300 tabular-nums">0</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right">
+                <% if (payCount > 0) { %>
+                  <span class="font-medium text-slate-700 tabular-nums"><%= payCount %></span>
+                <% } else { %>
+                  <span class="text-slate-300 tabular-nums">0</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right hidden md:table-cell">
+                <% if (pendingMyr > 0) { %>
+                  <span class="text-slate-600 tabular-nums">MYR <%= fmtMYR(pendingMyr) %></span>
+                <% } else { %>
+                  <span class="text-slate-300 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right">
+                <% if (paidIdr > 0) { %>
+                  <span class="font-semibold text-emerald-700 tabular-nums">IDR <%= fmtIDR(paidIdr) %></span>
+                <% } else { %>
+                  <span class="text-slate-300 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top hidden lg:table-cell text-[11px] text-slate-500">
+                <% if (s.last_activity_at) { %>
+                  <%= relativeTime(s.last_activity_at) %>
+                <% } else { %>
+                  <span class="text-slate-300">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right whitespace-nowrap">
+                <a href="/studios/<%= s.id %>/edit" class="text-[11px] font-semibold text-slate-600 hover:text-slate-900 tracking-wide uppercase">Edit</a>
+                <form method="POST" action="/studios/<%= s.id %>/delete" class="inline ml-2" onsubmit="return confirm('Delete this studio? This cannot be undone.')">
+                  <button type="submit" class="text-[11px] font-semibold text-rose-500 hover:text-rose-700 tracking-wide uppercase">Delete</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <% if (studios.length > 0) { %>
+          <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
+            <tr>
+              <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">Total</td>
+              <td class="px-2 py-2.5 text-right text-slate-900"><%= totals.affiliates %></td>
+              <td class="px-2 py-2.5 text-right text-slate-900 hidden sm:table-cell"><%= totals.users %></td>
+              <td class="px-2 py-2.5 text-right text-slate-900"><%= totals.payouts %></td>
+              <td class="px-2 py-2.5 text-right text-slate-700 hidden md:table-cell">MYR <%= fmtMYR(totals.pendingMyr) %></td>
+              <td class="px-2 py-2.5 text-right text-emerald-700">IDR <%= fmtIDR(totals.paidIdr) %></td>
+              <td class="px-2 py-2.5 hidden lg:table-cell"></td>
+              <td class="px-2 py-2.5"></td>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
+    </div>
+  </div>
 </div>

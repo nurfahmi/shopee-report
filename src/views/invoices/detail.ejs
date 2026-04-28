@@ -1,16 +1,16 @@
 <div class="max-w-4xl">
   <!-- Header -->
-  <div class="flex items-center justify-between mb-6">
-    <div class="flex items-center gap-3">
-      <a href="/invoices" class="text-gray-400 hover:text-gray-600">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="/invoices" class="text-gray-400 hover:text-gray-600 shrink-0">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
       </a>
-      <div>
-        <h1 class="text-2xl font-bold text-gray-800"><%= invoice.invoice_number %></h1>
-        <p class="text-gray-500 text-sm"><%= invoice.project_name %> · <%= invoice.client_name %></p>
+      <div class="min-w-0">
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-800 truncate"><%= invoice.invoice_number %></h1>
+        <p class="text-gray-500 text-sm truncate"><%= invoice.project_name %> · <%= invoice.client_name %></p>
       </div>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
       <% const ic = {draft:'bg-gray-100 text-gray-600',sent:'bg-blue-100 text-blue-700',partial:'bg-amber-100 text-amber-700',paid:'bg-emerald-100 text-emerald-700'}; %>
       <span class="px-3 py-1 rounded-full text-xs font-semibold <%= ic[invoice.status] %>"><%= invoice.status.toUpperCase() %></span>
       <a href="/invoices/<%= invoice.id %>/pdf" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg text-xs transition-colors">View PDF</a>
@@ -19,7 +19,7 @@
   </div>
 
   <!-- Invoice Info Cards -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
     <div class="bg-white rounded-xl border border-gray-200 p-4">
       <p class="text-xs font-medium text-gray-500">Issued By</p>
       <p class="text-sm font-semibold text-gray-800 mt-1"><%= invoice.business_name %></p>
@@ -43,6 +43,7 @@
   <!-- Line Items -->
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
     <div class="p-4 bg-gray-50 border-b border-gray-200"><p class="text-sm font-semibold text-gray-700">Line Items</p></div>
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
@@ -81,12 +82,14 @@
         </tr>
       </tfoot>
     </table>
+    </div>
   </div>
 
   <!-- Milestones -->
   <% if (invoice.payment_type === 'milestone' && milestones.length > 0) { %>
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
     <div class="p-4 bg-gray-50 border-b border-gray-200"><p class="text-sm font-semibold text-gray-700">Payment Milestones</p></div>
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
@@ -112,12 +115,14 @@
         <% }) %>
       </tbody>
     </table>
+    </div>
   </div>
   <% } %>
 
   <!-- Payments History -->
   <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
     <div class="p-4 bg-gray-50 border-b border-gray-200"><p class="text-sm font-semibold text-gray-700">Payments Received</p></div>
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-gray-50 border-b border-gray-200">
         <tr>
@@ -143,6 +148,7 @@
         <% }) %>
       </tbody>
     </table>
+    </div>
   </div>
 
   <!-- Actions -->
@@ -158,7 +164,7 @@
       <!-- Record Payment Form -->
       <div class="w-full bg-white rounded-xl border border-gray-200 p-5 mt-2">
         <p class="text-sm font-semibold text-gray-700 mb-3">Record Payment</p>
-        <form method="POST" action="/invoices/<%= invoice.id %>/payment" class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <form method="POST" action="/invoices/<%= invoice.id %>/payment" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
           <% if (invoice.payment_type === 'milestone' && milestones.filter(m => m.status !== 'paid').length > 0) { %>
             <select name="milestone_id" class="px-2 py-2 border border-gray-300 rounded text-sm bg-white">
               <option value="">General Payment</option>

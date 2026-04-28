@@ -46,6 +46,24 @@ router.post('/add', payoutController.postManualEntry);
 router.get('/transfer', payoutController.getTransfer);
 router.post('/transfer', proofUpload.single('proof'), payoutController.postBulkTransfer);
 
+// Bulk row actions on the main payouts page (no proof required)
+router.post('/bulk-collect', payoutController.postBulkCollect);
+router.post('/bulk-collect-bank', payoutController.postCollectBank);
+router.post('/bulk-collect-period', payoutController.postCollectPeriod);
+router.post('/bulk-transfer-period', payoutController.postTransferPeriod);
+router.post('/bulk-receive', payoutController.postBulkReceive);
+router.post('/bulk-receive-period', payoutController.postReceivePeriod);
+router.post('/bulk-confirm', payoutController.postBulkConfirm);
+
+// Studio Payments (ID admin + SA)
+router.get('/studio-payments', payoutController.getStudioPayments);
+router.post('/studio-payments/period/distribute', payoutController.postDistributePeriod);
+router.post('/studio-payments/:studioId/distribute',
+            proofUpload.single('proof'), payoutController.postDistributeStudio);
+
+// Period report PDF (SA + MY admin) — must come before /:id
+router.get('/report/:periodId', payoutController.getPeriodReport);
+
 // Status update
 router.post('/:id/status', proofUpload.single('proof'), payoutController.postUpdateStatus);
 router.post('/:id/delete', payoutController.postDelete);

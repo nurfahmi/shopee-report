@@ -1,80 +1,173 @@
-<div class="max-w-5xl">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-    <div>
-      <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Account Details</h1>
-      <p class="text-gray-500 text-sm mt-1">Shopee affiliate bank accounts receiving payouts</p>
+<%
+  const fmtMYR = n => parseFloat(n||0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtIDR = n => Math.round(parseFloat(n||0)).toLocaleString('id-ID');
+  const showStudio = user.role !== 'studio';
+  const showPhoneStatus = user.role !== 'malaysia_admin';
+%>
+
+<div class="max-w-6xl">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <div class="min-w-0">
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Account Details</h1>
+      <p class="text-slate-500 text-sm mt-1">
+        <%= affiliates.length %> bank account<%= affiliates.length === 1 ? '' : 's' %>
+        · <span class="tabular-nums"><%= totals.count %></span> invoice<%= totals.count === 1 ? '' : 's' %> tracked
+      </p>
     </div>
-    <% if (isISHAdmin) { %>
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-        <form method="POST" action="/shopee/affiliates/upload-statement" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <input type="file" name="bank_statement" accept=".pdf" required
-            class="text-sm file:mr-2 file:py-1.5 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 file:rounded-lg file:cursor-pointer">
-          <button type="submit" class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white font-medium rounded-lg text-xs transition-colors whitespace-nowrap">
-            Extract from PDF
-          </button>
+    <div class="flex items-center gap-2">
+      <% if (rateMeta && rateMeta.updated_at) { %>
+        <span class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium ring-1 ring-indigo-100 tabular-nums">
+          FX 1 MYR ≈ <%= rate.toLocaleString() %> IDR
+        </span>
+      <% } %>
+      <% if (isISHAdmin) { %>
+        <form method="POST" action="/shopee/affiliates/upload-statement" enctype="multipart/form-data" class="inline-flex items-center">
+          <label class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 hover:bg-slate-100 ring-1 ring-slate-200 rounded-lg text-[11px] font-semibold tracking-wide uppercase cursor-pointer transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m-7 0a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-4l-2-2H5a2 2 0 00-2 2v9z"/></svg>
+            Extract PDF
+            <input type="file" name="bank_statement" accept=".pdf" required class="hidden" onchange="this.form.submit()">
+          </label>
         </form>
-        <a href="/shopee/affiliates/create" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors whitespace-nowrap">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Add Manual
+        <a href="/shopee/affiliates/create" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-semibold tracking-wide uppercase shadow-sm transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Add
         </a>
-      </div>
-    <% } %>
+      <% } %>
+    </div>
   </div>
 
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <table class="w-full text-sm">
-      <thead class="bg-gray-50 border-b border-gray-200">
-        <tr>
-          <th class="text-left px-5 py-3 font-semibold text-gray-600">Account Holder</th>
-          <th class="text-left px-5 py-3 font-semibold text-gray-600">Bank</th>
-          <th class="text-left px-5 py-3 font-semibold text-gray-600">Account No.</th>
-          <th class="text-right px-5 py-3 font-semibold text-gray-600">Payouts</th>
-          <% if (user.role !== 'malaysia_admin') { %>
-            <th class="text-left px-5 py-3 font-semibold text-gray-600">Phone</th>
-            <th class="text-center px-5 py-3 font-semibold text-gray-600">Status</th>
-          <% } %>
-          <% if (isISHAdmin) { %>
-            <th class="text-right px-5 py-3 font-semibold text-gray-600">Actions</th>
-          <% } %>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
-        <% if (affiliates.length === 0) { %>
-          <tr><td colspan="7" class="px-5 py-8 text-center text-gray-400">No accounts registered yet.</td></tr>
-        <% } %>
-        <% affiliates.forEach(a => { %>
-          <tr class="hover:bg-gray-50 transition-colors">
-            <td class="px-5 py-3 font-medium text-gray-800"><%= a.full_name %></td>
-            <td class="px-5 py-3 text-gray-600"><%= a.bank_name %></td>
-            <td class="px-5 py-3 text-gray-600 font-mono text-xs"><%= a.account_number %></td>
-            <td class="px-5 py-3 text-right">
-              <% if (parseInt(a.payout_count) > 0) { %>
-                <span class="text-sm font-semibold text-gray-800"><%= parseInt(a.payout_count) %></span>
-                <span class="text-xs text-gray-400 block">MYR <%= parseFloat(a.payout_total).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                <span class="text-xs text-gray-300 block">~IDR <%= Math.round(parseFloat(a.payout_total) * rate).toLocaleString('id-ID') %></span>
-              <% } else { %>
-                <span class="text-xs text-gray-400">—</span>
-              <% } %>
-            </td>
-            <% if (user.role !== 'malaysia_admin') { %>
-              <td class="px-5 py-3 text-gray-600"><%= a.phone || '-' %></td>
-              <td class="px-5 py-3 text-center">
-                <span class="px-2.5 py-1 rounded-full text-xs font-medium <%= a.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' %>">
-                  <%= a.is_active ? 'Active' : 'Inactive' %>
-                </span>
-              </td>
+  <!-- Settlement table -->
+  <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-[13px]">
+        <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+          <tr>
+            <th class="text-left  px-3 py-2.5 font-semibold">Account Holder</th>
+            <th class="text-left  px-2 py-2.5 font-semibold hidden md:table-cell">Bank · Account</th>
+            <% if (showStudio) { %>
+              <th class="text-left  px-2 py-2.5 font-semibold hidden lg:table-cell">Studio</th>
+            <% } %>
+            <th class="text-right px-2 py-2.5 font-semibold">Invoices</th>
+            <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">Holder Commission</th>
+            <th class="text-right px-2 py-2.5 font-semibold">Sent to MY Admin</th>
+            <th class="text-right px-2 py-2.5 font-semibold hidden lg:table-cell">Pending</th>
+            <% if (showPhoneStatus) { %>
+              <th class="text-center px-2 py-2.5 font-semibold hidden xl:table-cell">Phone</th>
+              <th class="text-center px-2 py-2.5 font-semibold">Status</th>
             <% } %>
             <% if (isISHAdmin) { %>
-              <td class="px-5 py-3 text-right space-x-2">
-                <a href="/shopee/affiliates/<%= a.id %>/edit" class="text-indigo-600 hover:text-indigo-500 font-medium text-xs">Edit</a>
-                <form method="POST" action="/shopee/affiliates/<%= a.id %>/delete" class="inline" onsubmit="return confirm('Delete?')">
-                  <button type="submit" class="text-red-500 hover:text-red-600 font-medium text-xs">Delete</button>
-                </form>
-              </td>
+              <th class="px-2 py-2.5"></th>
             <% } %>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <% if (affiliates.length === 0) { %>
+            <tr><td colspan="20" class="px-5 py-10 text-center text-slate-400 text-sm">No accounts registered yet.</td></tr>
+          <% } %>
+          <% affiliates.forEach(a => { %>
+            <tr class="hover:bg-slate-50/60 transition-colors">
+              <td class="px-3 py-2.5 align-top">
+                <p class="font-semibold text-slate-900 leading-tight"><%= a.full_name %></p>
+                <p class="text-[10.5px] text-slate-400 md:hidden mt-0.5"><%= a.bank_name %> · <span class="font-mono"><%= a.account_number %></span></p>
+                <% if (a.lastPayoutDate) { %>
+                  <p class="text-[10px] text-slate-400 mt-0.5">
+                    Last <span class="tabular-nums">
+                      <% const ld = new Date(a.lastPayoutDate); const lm=String(ld.getMonth()+1).padStart(2,'0'); const ldy=String(ld.getDate()).padStart(2,'0'); %><%= ldy %>/<%= lm %>/<%= ld.getFullYear() %>
+                    </span>
+                  </p>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-[11px] text-slate-500 leading-tight hidden md:table-cell">
+                <%= a.bank_name %><br>
+                <span class="font-mono text-[10.5px] text-slate-400"><%= a.account_number %></span>
+              </td>
+              <% if (showStudio) { %>
+                <td class="px-2 py-2.5 align-top text-[11px] text-slate-600 hidden lg:table-cell"><%= a.studio_name || '—' %></td>
+              <% } %>
+              <td class="px-2 py-2.5 align-top text-right">
+                <% if (a.invoiceCount > 0) { %>
+                  <span class="font-semibold text-slate-900 tabular-nums"><%= a.invoiceCount %></span>
+                <% } else { %>
+                  <span class="text-slate-300 tabular-nums">0</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right hidden sm:table-cell">
+                <% if (a.holderKeptMyr > 0) { %>
+                  <span class="font-semibold text-amber-700 tabular-nums">MYR <%= fmtMYR(a.holderKeptMyr) %></span>
+                  <span class="block text-[10.5px] text-amber-500/70 tabular-nums mt-0.5">~IDR <%= fmtIDR(a.holderKeptMyr * rate) %></span>
+                <% } else { %>
+                  <span class="text-slate-300 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right">
+                <% if (a.holderSentMyr > 0) { %>
+                  <span class="font-semibold text-emerald-700 tabular-nums">MYR <%= fmtMYR(a.holderSentMyr) %></span>
+                  <span class="block text-[10.5px] text-emerald-500/70 tabular-nums mt-0.5">~IDR <%= fmtIDR(a.holderSentMyr * rate) %></span>
+                <% } else { %>
+                  <span class="text-slate-300 text-xs">—</span>
+                <% } %>
+              </td>
+              <td class="px-2 py-2.5 align-top text-right hidden lg:table-cell">
+                <% if (a.holderPendingMyr > 0) { %>
+                  <span class="text-slate-700 tabular-nums">MYR <%= fmtMYR(a.holderPendingMyr) %></span>
+                <% } else { %>
+                  <span class="text-slate-300 text-xs">—</span>
+                <% } %>
+              </td>
+              <% if (showPhoneStatus) { %>
+                <td class="px-2 py-2.5 align-top text-center text-[11px] text-slate-500 hidden xl:table-cell font-mono"><%= a.phone || '—' %></td>
+                <td class="px-2 py-2.5 align-top text-center">
+                  <% if (a.is_active) { %>
+                    <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70">ACTIVE</span>
+                  <% } else { %>
+                    <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-slate-100 text-slate-500 ring-1 ring-slate-200/70">INACTIVE</span>
+                  <% } %>
+                </td>
+              <% } %>
+              <% if (isISHAdmin) { %>
+                <td class="px-2 py-2.5 align-top text-right whitespace-nowrap">
+                  <a href="/shopee/affiliates/<%= a.id %>/edit" class="text-[11px] font-semibold text-slate-600 hover:text-slate-900 tracking-wide uppercase">Edit</a>
+                  <form method="POST" action="/shopee/affiliates/<%= a.id %>/delete" class="inline ml-2" onsubmit="return confirm('Delete?')">
+                    <button type="submit" class="text-[11px] font-semibold text-rose-500 hover:text-rose-700 tracking-wide uppercase">Delete</button>
+                  </form>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+        <% if (affiliates.length > 0) { %>
+          <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
+            <tr>
+              <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">Total</td>
+              <td class="px-2 py-2.5 hidden md:table-cell"></td>
+              <% if (showStudio) { %><td class="px-2 py-2.5 hidden lg:table-cell"></td><% } %>
+              <td class="px-2 py-2.5 text-right text-slate-900"><%= totals.count %></td>
+              <td class="px-2 py-2.5 text-right text-amber-700 hidden sm:table-cell">MYR <%= fmtMYR(totals.kept) %></td>
+              <td class="px-2 py-2.5 text-right text-emerald-700">MYR <%= fmtMYR(totals.sent) %></td>
+              <td class="px-2 py-2.5 text-right text-slate-700 hidden lg:table-cell">MYR <%= fmtMYR(totals.pending) %></td>
+              <% if (showPhoneStatus) { %>
+                <td class="px-2 py-2.5 hidden xl:table-cell"></td>
+                <td class="px-2 py-2.5"></td>
+              <% } %>
+              <% if (isISHAdmin) { %><td class="px-2 py-2.5"></td><% } %>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-500">
+    <span class="inline-flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Holder Commission = bank holder's share
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent to MY Admin = received from bank holder
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Pending = expected from bank holder, not yet collected
+    </span>
   </div>
 </div>

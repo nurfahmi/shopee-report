@@ -1,273 +1,789 @@
+<%
+  const fmtMYR = n => parseFloat(n||0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Floor IDR to nearest 100 — Indonesian banks don't transfer fractional rupiahs.
+  const fmtIDR = n => (Math.floor(Math.max(0, parseFloat(n||0)) / 100) * 100).toLocaleString('id-ID');
+
+  // Pipeline stages used by Studio's per-period stepper.
+  const STAGE_BUCKETS = [
+    { key: 'uploaded',    label: 'Uploaded',    statuses: ['processing']             },
+    { key: 'collected',   label: 'Collected',   statuses: ['collected']              },
+    { key: 'transit',     label: 'In Transit',  statuses: ['transferring','received']},
+    { key: 'distributed', label: 'Distributed', statuses: ['distributed']            },
+    { key: 'paid',        label: 'Paid',        statuses: ['completed']              },
+  ];
+  const STEP_IDX = {};
+  STAGE_BUCKETS.forEach((b, i) => b.statuses.forEach(st => { STEP_IDX[st] = i; }));
+
+  // Format a YYYY-MM-DD as DD/MM/YYYY
+  const fmtDate = (s) => { if (!s) return 'Undated'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
+%>
+
 <div class="max-w-6xl">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-1">
-    <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Shopee Payouts</h1>
-    <% if (user.role === 'malaysia_admin' || user.role === 'superadmin') { %>
-      <a href="/shopee/payouts/transfer" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-        Bulk Transfer
-      </a>
-    <% } %>
-  </div>
-  <p class="text-gray-500 text-sm mb-6">Track affiliate payouts from Shopee.</p>
-
-  <!-- Stats -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-medium text-gray-500">Total</p>
-      <p class="text-xl font-bold text-gray-800 mt-1"><%= parseInt(stats.total_entries) %></p>
-      <p class="text-xs text-gray-400">MYR <%= parseFloat(stats.total_myr).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
-      <p class="text-xs text-gray-300">~IDR <%= Math.round(parseFloat(stats.total_myr) * rate).toLocaleString('id-ID') %></p>
-    </div>
-    <div class="bg-white rounded-xl border border-blue-200 p-4">
-      <p class="text-xs font-medium text-blue-600">Processing</p>
-      <p class="text-xl font-bold text-blue-700 mt-1"><%= parseInt(stats.processing_count || 0) %></p>
-      <p class="text-xs text-blue-400"><%= parseFloat(stats.processing_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
-      <p class="text-xs text-blue-300">~IDR <%= Math.round(parseFloat(stats.processing_myr || 0) * rate).toLocaleString('id-ID') %></p>
-    </div>
-    <div class="bg-white rounded-xl border border-amber-200 p-4">
-      <p class="text-xs font-medium text-amber-600">Collected</p>
-      <p class="text-xl font-bold text-amber-700 mt-1"><%= parseInt(stats.collected_count || 0) %></p>
-      <p class="text-xs text-amber-400"><%= parseFloat(stats.collected_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
-      <p class="text-xs text-amber-300">~IDR <%= Math.round(parseFloat(stats.collected_myr || 0) * rate).toLocaleString('id-ID') %></p>
-    </div>
-    <div class="bg-white rounded-xl border border-indigo-200 p-4">
-      <p class="text-xs font-medium text-indigo-600">Transferring</p>
-      <p class="text-xl font-bold text-indigo-700 mt-1"><%= parseInt(stats.transferring_count || 0) %></p>
-    </div>
-    <div class="bg-white rounded-xl border border-purple-200 p-4">
-      <p class="text-xs font-medium text-purple-600">Received</p>
-      <p class="text-xl font-bold text-purple-700 mt-1"><%= parseInt(stats.received_count || 0) + parseInt(stats.distributed_count || 0) %></p>
-    </div>
-    <div class="bg-white rounded-xl border border-emerald-200 p-4">
-      <p class="text-xs font-medium text-emerald-600">Completed</p>
-      <p class="text-xl font-bold text-emerald-700 mt-1"><%= parseInt(stats.completed_count || 0) %></p>
-      <p class="text-xs text-emerald-400"><%= parseFloat(stats.completed_myr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
-      <p class="text-xs text-emerald-300">~IDR <%= Math.round(parseFloat(stats.completed_myr || 0) * rate).toLocaleString('id-ID') %></p>
-    </div>
-  </div>
-
-  <!-- Input Section (ISH admin + studio only) -->
-  <% if (isISHAdmin || isStudio) { %>
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
-    <!-- Tab buttons -->
-    <div class="flex border-b border-gray-200">
-      <button onclick="showTab('upload')" id="tab-upload" class="flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition-colors">
-        📄 Upload Invoices
-      </button>
-      <button onclick="showTab('manual')" id="tab-manual" class="flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
-        ✏️ Manual Entry
-      </button>
-    </div>
-
-    <!-- Upload tab -->
-    <div id="panel-upload" class="p-5">
-      <p class="text-xs text-gray-400 mb-3">Upload Shopee PDF invoices. Auto-extracts & auto-links to affiliate accounts.</p>
-      <form method="POST" action="/shopee/payouts/upload" enctype="multipart/form-data" class="space-y-3">
-        <% if (typeof studios !== 'undefined' && studios.length > 0) { %>
-          <select name="studio_id" required
-            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-            <option value="">— Select Studio —</option>
-            <% studios.forEach(s => { %>
-              <option value="<%= s.id %>"><%= s.name %></option>
-            <% }) %>
-          </select>
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <div class="min-w-0">
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Shopee Payouts</h1>
+      <p class="text-slate-500 text-sm mt-1">
+        <% if (isMYAdmin || isSuperAdmin) { %>
+          <%= myTotals.pendingBanks %> bank<%= myTotals.pendingBanks === 1 ? '' : 's' %> pending
+          · <span class="tabular-nums">MYR <%= fmtMYR(myTotals.fromHolderMyr) %></span> across all periods
+        <% } else if (user.role === 'indonesia_admin') { %>
+          <%= incomingTransfers.length %> transfer<%= incomingTransfers.length === 1 ? '' : 's' %> to confirm
+          · <%= studioSettlement.length %> studio<%= studioSettlement.length === 1 ? '' : 's' %> to pay
+        <% } else if (isStudio) { %>
+          Upload Shopee invoices and confirm payments here.
+        <% } else { %>
+          All money flows through this page.
         <% } %>
-        <input type="file" name="shopee_invoices" multiple accept=".pdf"
-          class="w-full text-sm file:mr-3 file:py-1.5 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 file:rounded-lg file:cursor-pointer">
-        <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-sm transition-colors">
-          Upload & Extract
-        </button>
-      </form>
+      </p>
     </div>
-
-    <!-- Manual tab -->
-    <div id="panel-manual" class="p-5 hidden">
-      <p class="text-xs text-gray-400 mb-3">Select account holder and enter payout details manually.</p>
-      <form method="POST" action="/shopee/payouts/add" class="space-y-2">
-        <select name="affiliate_account_id" required
-          class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-          <option value="">— Select Account Holder —</option>
-          <% affiliates.forEach(a => { %>
-            <option value="<%= a.id %>"><%= a.full_name %> (<%= a.bank_name %> - <%= a.account_number %>)</option>
-          <% }) %>
-        </select>
-        <div class="grid grid-cols-3 gap-2">
-          <input type="number" name="payout_amount" step="0.01" required placeholder="MYR amount"
-            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-          <input type="number" name="tax_amount" step="0.01" value="0" placeholder="Tax"
-            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-          <input type="date" name="invoice_date"
-            class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-        </div>
-        <input type="text" name="period_description" placeholder="Period (e.g. 05-03-2026 to 15-04-2026)"
-          class="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-        <button type="submit" class="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm transition-colors">
-          Add Entry
-        </button>
-      </form>
+    <div class="flex items-center gap-2 text-xs">
+      <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full font-medium ring-1 ring-indigo-100 tabular-nums">
+        FX 1 MYR ≈ <%= rate.toLocaleString() %> IDR
+        <% if (rateMeta && rateMeta.updated_at) { %><span class="text-indigo-400">· <%= relativeTime(rateMeta.updated_at) %></span><% } %>
+      </span>
     </div>
   </div>
 
-  <script>
-    function showTab(tab) {
-      document.getElementById('panel-upload').classList.toggle('hidden', tab !== 'upload');
-      document.getElementById('panel-manual').classList.toggle('hidden', tab !== 'manual');
-      const tabU = document.getElementById('tab-upload');
-      const tabM = document.getElementById('tab-manual');
-      if (tab === 'upload') {
-        tabU.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition-colors';
-        tabM.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
-      } else {
-        tabM.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-emerald-600 text-emerald-700 bg-emerald-50 transition-colors';
-        tabU.className = 'flex-1 px-5 py-3 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
-      }
-    }
-  </script>
+  <!-- ═════════════════ Studio KPIs (studio role only) ═════════════════ -->
+  <% if (isStudio) { %>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Pending Payment</p>
+        <p class="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 tabular-nums">~IDR <%= fmtIDR(studioKpi.pendingIdr) %></p>
+        <p class="text-[11px] text-slate-500 mt-1"><%= studioKpi.pendingCount %> invoice<%= studioKpi.pendingCount === 1 ? '' : 's' %> in pipeline</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5 <%= studioKpi.onTheWayCount > 0 ? 'ring-2 ring-orange-400/60' : '' %>">
+        <p class="text-[10px] font-semibold uppercase tracking-wider <%= studioKpi.onTheWayCount > 0 ? 'text-orange-600' : 'text-slate-500' %>">On The Way</p>
+        <p class="text-xl sm:text-2xl font-bold mt-1.5 tabular-nums <%= studioKpi.onTheWayCount > 0 ? 'text-orange-700' : 'text-slate-900' %>">~IDR <%= fmtIDR(studioKpi.onTheWayIdr) %></p>
+        <p class="text-[11px] mt-1 <%= studioKpi.onTheWayCount > 0 ? 'text-orange-600' : 'text-slate-500' %>"><%= studioKpi.onTheWayCount %> awaiting your confirmation</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
+        <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Paid This Month</p>
+        <p class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1.5 tabular-nums">~IDR <%= fmtIDR(studioKpi.paidThisMonthIdr) %></p>
+        <p class="text-[11px] text-slate-500 mt-1"><%= studioKpi.paidThisMonthCount %> received this month · YTD ~IDR <%= fmtIDR(studioKpi.paidTotalIdr) %></p>
+      </div>
+    </div>
   <% } %>
 
-  <!-- Pipeline Legend -->
-  <div class="flex items-center gap-2 text-xs text-gray-400 mb-3 flex-wrap">
-    <span class="font-medium text-gray-500">Flow:</span>
-    <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">Processing</span> →
-    <span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded">Collected</span> →
-    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded">Transferring</span> →
-    <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded">Received</span> →
-    <span class="px-2 py-0.5 bg-orange-50 text-orange-600 rounded">Distributed</span> →
-    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">Completed</span>
-  </div>
+  <!-- ═════════════════ Unified period loop (all roles) ═════════════════ -->
+  <%
+    // Show every period that has any entries — including ones already past the
+    // user's actionable stage (history). Empty periods are filtered out.
+    const visiblePeriods = periodGroups.filter(p => {
+      if (isStudio) return (p.studioEntries || []).length > 0;
+      return (p.totalEntries || 0) > 0;
+    });
+  %>
 
-  <!-- Entries Table -->
-  <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-      <p class="text-sm font-semibold text-gray-700">All Payouts</p>
-      <p class="text-xs text-gray-400">1 MYR ≈ <%= rate.toLocaleString() %> IDR (estimated)</p>
+  <% if (visiblePeriods.length === 0) { %>
+    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-10 text-center">
+      <p class="text-[13px] text-slate-400">No actionable payout periods right now.</p>
     </div>
-    <% if (!entries.length) { %>
-      <div class="px-5 py-12 text-center text-gray-400">
-        <p class="text-lg mb-1">No payouts yet</p>
-        <p class="text-sm">Upload Shopee invoice PDFs or add entries manually above.</p>
-      </div>
-    <% } else { %>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
-              <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">Invoice</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">Net</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600">
-                <% if (user.role === 'malaysia_admin') { %>Transfer
-                <% } else if (user.role === 'indonesia_admin') { %>Earnings
-                <% } else if (user.role === 'studio') { %>Net Payout
-                <% } else { %>Studio Net
-                <% } %>
-              </th>
-              <th class="text-center px-4 py-3 font-semibold text-gray-600">Status</th>
-              <th class="text-right px-4 py-3 font-semibold text-gray-600"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <% entries.forEach(e => { %>
-              <%
-                const colors = {
-                  processing:   'bg-blue-100 text-blue-700',
-                  collected:    'bg-amber-100 text-amber-700',
-                  transferring: 'bg-indigo-100 text-indigo-700',
-                  received:     'bg-purple-100 text-purple-700',
-                  distributed:  'bg-orange-100 text-orange-700',
-                  completed:    'bg-emerald-100 text-emerald-700'
-                };
+  <% } %>
 
-                // Next action per status + role
-                let nextAction = null;
-                const role = user.role;
-                if (e.payment_status === 'processing' && (role === 'malaysia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'collected', label: 'Collect', color: 'bg-amber-600 hover:bg-amber-500' };
-                } else if (e.payment_status === 'collected' && (role === 'malaysia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'transferring', label: 'Transfer', color: 'bg-indigo-600 hover:bg-indigo-500', needsProof: true };
-                } else if (e.payment_status === 'transferring' && (role === 'indonesia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'received', label: 'Received', color: 'bg-purple-600 hover:bg-purple-500' };
-                } else if (e.payment_status === 'received' && (role === 'indonesia_admin' || role === 'superadmin')) {
-                  nextAction = { status: 'distributed', label: 'Distributed', color: 'bg-orange-600 hover:bg-orange-500', needsProof: true };
-                } else if (e.payment_status === 'distributed' && (role === 'studio' || role === 'superadmin')) {
-                  nextAction = { status: 'completed', label: 'Confirm', color: 'bg-emerald-600 hover:bg-emerald-500' };
-                }
-              %>
-              <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
-                <td class="px-4 py-3">
-                  <p class="font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></p>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    <% if (e.affiliate_name) { %>
-                      <span class="text-xs text-emerald-500">✓ linked</span>
-                    <% } else { %>
-                      <span class="text-xs text-amber-500">unlinked</span>
-                    <% } %>
-                    <% if (e.invoice_file_path) { %>
-                      <span class="text-xs text-indigo-500">📄 pdf</span>
-                    <% } %>
-                    <% if (e.studio_name) { %>
-                      <span class="text-xs text-gray-400"><%= e.studio_name %></span>
-                    <% } %>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
-                <td class="px-4 py-3 text-right">
-                  <span class="font-semibold text-gray-800"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                  <span class="text-xs text-gray-300 block">~IDR <%= Math.round(parseFloat(e.payout_amount) * rate).toLocaleString('id-ID') %></span>
-                </td>
-                <%
-                  const amt = parseFloat(e.payout_amount);
-                  const netAmt = amt * (1 - 0.01 - 0.01 * 0.08);
-                  const genDed = netAmt * deductions.general / 100;
-                  const myDed = netAmt * deductions.myAdmin / 100;
-                  const idDed = netAmt * deductions.idAdmin / 100;
-                  const afterMyAdmin = netAmt - genDed - myDed;
-                  const idEarnings = idDed;
-                  const studioNet = netAmt - genDed - myDed - idDed;
-                %>
-                <td class="px-4 py-3 text-right">
-                  <span class="font-semibold text-gray-600"><%= netAmt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                  <span class="text-xs text-gray-300 block">~IDR <%= Math.round(netAmt * rate).toLocaleString('id-ID') %></span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <% if (user.role === 'malaysia_admin') { %>
-                    <span class="font-semibold text-indigo-700"><%= afterMyAdmin.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                    <span class="text-xs text-indigo-400 block">~IDR <%= Math.round(afterMyAdmin * rate).toLocaleString('id-ID') %></span>
-                  <% } else if (user.role === 'indonesia_admin') { %>
-                    <span class="font-semibold text-emerald-700"><%= idEarnings.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                    <span class="text-xs text-emerald-400 block">~IDR <%= Math.round(idEarnings * rate).toLocaleString('id-ID') %></span>
-                  <% } else if (user.role === 'studio') { %>
-                    <span class="font-semibold text-emerald-700">~<%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                    <span class="text-xs text-emerald-400 block">~IDR <%= Math.round(studioNet * rate).toLocaleString('id-ID') %></span>
-                  <% } else { %>
-                    <span class="font-semibold text-emerald-700"><%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                    <span class="text-xs text-emerald-400 block">~IDR <%= Math.round(studioNet * rate).toLocaleString('id-ID') %></span>
-                  <% } %>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[e.payment_status] || '' %>"><%= e.payment_status %></span>
-                </td>
-                <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
-                  <% if (nextAction && !nextAction.needsProof) { %>
-                    <form method="POST" action="/shopee/payouts/<%= e.id %>/status" class="inline">
-                      <input type="hidden" name="status" value="<%= nextAction.status %>">
-                      <button class="text-xs px-2.5 py-1 <%= nextAction.color %> text-white rounded font-medium"><%= nextAction.label %></button>
-                    </form>
-                  <% } else if (nextAction && nextAction.needsProof) { %>
-                    <a href="/shopee/payouts/<%= e.id %>" class="text-xs px-2.5 py-1 <%= nextAction.color %> text-white rounded font-medium inline-block"><%= nextAction.label %> 📎</a>
-                  <% } %>
-                  <% if (isISHAdmin && e.payment_status === 'processing') { %>
-                    <form method="POST" action="/shopee/payouts/<%= e.id %>/delete" class="inline ml-1" onsubmit="return confirm('Delete?')">
-                      <button class="text-xs px-2 py-1 text-red-400 hover:text-red-600">✕</button>
-                    </form>
-                  <% } %>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+  <% visiblePeriods.forEach((period, pi) => {
+       const dateLabel = fmtDate(period.invoice_date);
+       const incomingBatches = period.incomingBatches || [];
+       const periodStudios   = period.studios || [];
+       const distributions   = period.distributions || [];
+       const studioEntries   = period.studioEntries || [];
+
+       // ── MY admin counts ──
+       const periodPending = period.banks.reduce((s, b) => s + b.processingCount, 0);
+       const periodPendingMyr = period.banks.reduce((s, b) =>
+         s + b.entries.filter(e => e.payment_status === 'processing')
+           .reduce((ss, e) => ss + e.breakdown.needToPay, 0), 0);
+       const periodCollected = period.banks.reduce((s, b) => s + b.collectedCount, 0);
+       const periodCollectedMyr = period.banks.reduce((s, b) =>
+         s + b.entries.filter(e => e.payment_status === 'collected')
+           .reduce((ss, e) => {
+             const got = e.actual_collected_myr != null ? parseFloat(e.actual_collected_myr) : e.breakdown.needToPay;
+             return ss + got - e.breakdown.myAdminFee - e.breakdown.myHQFee - e.breakdown.shopeeService - e.breakdown.shopeeSST;
+           }, 0), 0);
+
+       // ── ID admin counts ──
+       const incomingTotalMyr = incomingBatches.reduce((s, b) => s + b.fromMyMyr, 0);
+       const studiosTotalMyr  = periodStudios.reduce((s, st) => s + st.toStudioMyr, 0);
+
+       // ── Studio counts ──
+       let studioTotalCount = 0, studioExpectedIdr = 0, studioReceivedIdr = 0;
+       const stageCounts = { processing:0, collected:0, transferring:0, received:0, distributed:0, completed:0 };
+       const pendingDistroBatches = [];
+       if (isStudio) {
+         studioTotalCount = studioEntries.length;
+         for (const e of studioEntries) {
+           stageCounts[e.payment_status] = (stageCounts[e.payment_status] || 0) + 1;
+           const idr = e.actual_distributed_idr != null ? parseFloat(e.actual_distributed_idr) : (e.breakdown.netToStudio * rate);
+           studioExpectedIdr += idr;
+           if (e.payment_status === 'completed' || e.payment_status === 'distributed') studioReceivedIdr += idr;
+         }
+         // Per-period distribution batches awaiting studio confirmation
+         for (const d of distributions) pendingDistroBatches.push(d);
+       }
+       const stepProgress = STAGE_BUCKETS.map((_, i) => {
+         let r = 0;
+         for (const e of studioEntries) {
+           const si = STEP_IDX[e.payment_status];
+           if (si != null && si >= i) r++;
+         }
+         return r;
+       });
+       let studioActiveStep = STAGE_BUCKETS.length - 1;
+       for (let i = 0; i < STAGE_BUCKETS.length; i++) {
+         if (stepProgress[i] < studioTotalCount) { studioActiveStep = i; break; }
+       }
+       const studioIsPaid = isStudio && studioActiveStep === STAGE_BUCKETS.length - 1 && stepProgress[STAGE_BUCKETS.length - 1] === studioTotalCount;
+
+       // ── action visibility ──
+       const isIDAdmin = user.role === 'indonesia_admin';
+       const showCollectBtn  = (isMYAdmin || isSuperAdmin) && periodPending   > 0 && period.invoice_date;
+       const showTransferBtn = (isMYAdmin || isSuperAdmin) && periodCollected > 0 && period.invoice_date;
+       const showReceiveBtn  = (isIDAdmin || isSuperAdmin) && incomingBatches.length > 0 && period.invoice_date;
+       const showStudioConfirmBtn = isStudio && pendingDistroBatches.length > 0;
+
+       const collectFormId   = `collect-form-${period.invoice_date || 'undated'}`;
+       const receiveFormId   = `receive-form-${period.invoice_date || 'undated'}`;
+       const transferModalId = `transfer-modal-${period.invoice_date || 'undated'}`;
+
+       // Period top-line total
+       let topLineLabel, topLineValue;
+       if (isStudio) {
+         topLineLabel = studioIsPaid ? 'Received' : "You'll receive";
+         topLineValue = `~IDR ${fmtIDR(studioIsPaid ? (studioReceivedIdr || studioExpectedIdr) : studioExpectedIdr)}`;
+       } else if (user.role === 'indonesia_admin') {
+         topLineValue = `MYR ${fmtMYR(incomingTotalMyr + studiosTotalMyr)}`;
+         topLineLabel = '';
+       } else {
+         topLineValue = `MYR ${fmtMYR(period.totals.fromHolderMyr)}`;
+         topLineLabel = '';
+       }
+  %>
+
+    <!-- Hidden forms outside summary so clicking them doesn't toggle the period -->
+    <% if (showCollectBtn) { %>
+      <form id="<%= collectFormId %>" method="POST" action="/shopee/payouts/bulk-collect-period" class="hidden">
+        <input type="hidden" name="invoice_date" value="<%= period.invoice_date %>">
+      </form>
     <% } %>
-  </div>
+    <% if (showReceiveBtn) { %>
+      <form id="<%= receiveFormId %>" method="POST" action="/shopee/payouts/bulk-receive-period" class="hidden">
+        <input type="hidden" name="invoice_date" value="<%= period.invoice_date %>">
+      </form>
+    <% } %>
+
+    <details class="mb-3 group">
+      <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 group-open:rounded-b-none px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:ring-slate-300 transition">
+        <!-- Left: chevron + date + counts -->
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <svg class="w-3.5 h-3.5 text-slate-400 transition-transform group-open:rotate-90 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          <div class="min-w-0">
+            <h2 class="text-[15px] sm:text-base font-semibold text-slate-900 tracking-tight truncate">
+              Payout <span class="tabular-nums"><%= dateLabel %></span>
+            </h2>
+            <p class="text-[11px] text-slate-500 truncate mt-0.5">
+              <%
+                const subParts = [];
+                if (isMYAdmin || isSuperAdmin) {
+                  if (period.banks.length > 0) {
+                    let s = `${period.banks.length} bank${period.banks.length === 1 ? '' : 's'}`;
+                    if (periodPending > 0)   s += ` · <span class="text-amber-700 font-medium">${periodPending} pending</span>`;
+                    if (periodCollected > 0) s += ` · <span class="text-indigo-700 font-medium">${periodCollected} collected</span>`;
+                    subParts.push(s);
+                  }
+                }
+                if (user.role === 'indonesia_admin' || isSuperAdmin) {
+                  if (incomingBatches.length > 0) subParts.push(`<span class="text-indigo-700 font-medium">${incomingBatches.length} incoming</span>`);
+                  if (periodStudios.length > 0)   subParts.push(`<span class="text-orange-700 font-medium">${periodStudios.length} to pay</span>`);
+                }
+                if (isStudio) {
+                  let s = `${studioTotalCount} invoice${studioTotalCount === 1 ? '' : 's'}`;
+                  if (showStudioConfirmBtn) s += ` · <span class="text-orange-700 font-medium animate-pulse">action required</span>`;
+                  subParts.push(s);
+                }
+                // Fallback for non-studio roles when no actionable items: show total entry count
+                if (subParts.length === 0 && !isStudio) {
+                  subParts.push(`${period.totalEntries} invoice${period.totalEntries === 1 ? '' : 's'} · <span class="text-emerald-600 font-medium">settled</span>`);
+                }
+                if (period.periodDescriptions.length === 1) subParts.push(period.periodDescriptions[0]);
+              %>
+              <%- subParts.join(' · ') %>
+            </p>
+          </div>
+        </div>
+
+        <!-- Right: actions + total -->
+        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <% if (showCollectBtn) { %>
+            <button type="button"
+                    onclick="event.preventDefault(); event.stopPropagation(); if (confirm('Mark all <%= periodPending %> pending invoices for this period as collected at expected amounts (MYR <%= fmtMYR(periodPendingMyr) %>)?\n\nUse the per-bank Mark Collected button instead if any actual amount differs.')) document.getElementById('<%= collectFormId %>').submit();"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[10.5px] font-semibold tracking-wide uppercase rounded-lg shadow-sm transition whitespace-nowrap">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              Collect All
+            </button>
+          <% } %>
+          <% if (showTransferBtn) { %>
+            <button type="button"
+                    onclick="event.preventDefault(); event.stopPropagation(); document.getElementById('<%= transferModalId %>').showModal();"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-semibold tracking-wide uppercase rounded-lg shadow-sm transition whitespace-nowrap">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              Mark Transferred
+            </button>
+          <% } %>
+          <% if (showReceiveBtn) {
+               const incomingTotal = incomingBatches.reduce((s, b) => s + b.fromMyMyr, 0);
+               const incomingCount = incomingBatches.reduce((s, b) => s + b.count, 0);
+          %>
+            <button type="button"
+                    onclick="event.preventDefault(); event.stopPropagation(); if (confirm('Mark all <%= incomingCount %> incoming entries (MYR <%= fmtMYR(incomingTotal) %>) for this period as received?')) document.getElementById('<%= receiveFormId %>').submit();"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-[10.5px] font-semibold tracking-wide uppercase rounded-lg shadow-sm transition whitespace-nowrap">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              Mark Received
+            </button>
+          <% } %>
+          <% if (showStudioConfirmBtn) { %>
+            <% pendingDistroBatches.forEach((d, di) => { %>
+              <form method="POST" action="/shopee/payouts/bulk-confirm" class="inline" onclick="event.stopPropagation();" onsubmit="event.stopPropagation(); return confirm('Confirm receipt of IDR <%= fmtIDR(d.totalIdr) %>?');">
+                <% d.ids.forEach(id => { %><input type="hidden" name="entry_ids" value="<%= id %>"><% }) %>
+                <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-semibold tracking-wide uppercase rounded-lg shadow-sm transition whitespace-nowrap" onclick="event.preventDefault(); event.stopPropagation(); this.form.requestSubmit();">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  Confirm Receipt
+                </button>
+              </form>
+            <% }) %>
+          <% } %>
+          <span class="text-[11px] font-semibold text-slate-900 tabular-nums">
+            <% if (topLineLabel) { %><span class="text-[10px] text-slate-500 font-normal mr-1"><%= topLineLabel %></span><% } %>
+            <%= topLineValue %>
+          </span>
+        </div>
+      </summary>
+
+      <%
+        // Decide whether the body has any role-relevant content to render. If not,
+        // we render a compact "settled" state so the period card still shows history.
+        const hasMYBody = (isMYAdmin || isSuperAdmin) && period.banks.length > 0;
+        const hasIDBody = (user.role === 'indonesia_admin' || isSuperAdmin) && (incomingBatches.length > 0 || periodStudios.length > 0);
+        const hasStudioBody = isStudio && studioEntries.length > 0;
+        const hasAnyBody = hasMYBody || hasIDBody || hasStudioBody;
+      %>
+      <div class="bg-white rounded-b-xl shadow-sm ring-1 ring-slate-200/70 ring-t-0 border-t border-slate-100 overflow-hidden">
+
+      <!-- ═══ Settled / history placeholder when nothing actionable ═══ -->
+      <% if (!hasAnyBody) { %>
+        <div class="px-4 sm:px-5 py-5">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2.5 text-[12px] text-slate-500">
+              <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>All settled · <%= period.totalEntries %> invoice<%= period.totalEntries === 1 ? '' : 's' %> · MYR <span class="tabular-nums"><%= fmtMYR(period.grossMyr) %></span> processed</span>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap text-[10px]">
+              <% Object.entries(period.statusCounts).forEach(([st, c]) => { if (c > 0) { %>
+                <span class="px-1.5 py-0.5 rounded-md font-semibold tracking-wide bg-slate-50 text-slate-600 ring-1 ring-slate-200/70 tabular-nums"><%= c %> <%= st %></span>
+              <% } }) %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <!-- ═══ MY admin / SA: banks settlement table ═══ -->
+      <% if ((isMYAdmin || isSuperAdmin) && period.banks.length > 0) { %>
+        <% if (isSuperAdmin && (incomingBatches.length > 0 || periodStudios.length > 0 || studioEntries.length > 0)) { %>
+          <div class="px-4 sm:px-5 pt-3 pb-1">
+            <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Bank Settlement</h3>
+          </div>
+        <% } %>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th class="text-left  px-3 py-2.5 font-semibold">Bank Holder</th>
+                <th class="text-left  px-2 py-2.5 font-semibold hidden xl:table-cell">Bank · Account</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden md:table-cell">Invoice</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden xl:table-cell">Shopee 1%</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden xl:table-cell">SST</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden lg:table-cell">Holder Receives</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">MY <%= deductions.myAdmin %>%</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">HQ <%= deductions.myHQ || 0 %>%</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden md:table-cell">Holder <%= deductions.general %>%</th>
+                <th class="text-right px-2 py-2.5 font-semibold">Need to Pay</th>
+                <th class="text-right px-2 py-2.5 font-semibold">To Indonesia</th>
+                <th class="text-center px-2 py-2.5 font-semibold">Status</th>
+                <th class="px-2 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% period.banks.forEach((g, i) => {
+                   const expectedNet = g.entries
+                     .filter(e => e.payment_status === 'processing')
+                     .reduce((s, e) => s + e.breakdown.needToPay, 0);
+              %>
+                <tr class="hover:bg-slate-50/60 transition-colors">
+                  <td class="px-3 py-2.5 align-top">
+                    <p class="font-semibold text-slate-900 leading-tight"><%= g.holders.join(', ') %></p>
+                    <p class="text-[10.5px] text-slate-400 xl:hidden mt-0.5"><%= g.bank_name %> · <span class="font-mono"><%= g.account_number %></span></p>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-[11px] text-slate-500 leading-tight hidden xl:table-cell">
+                    <%= g.bank_name %><br>
+                    <span class="font-mono text-[10.5px] text-slate-400"><%= g.account_number %></span>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-right text-slate-700 tabular-nums hidden md:table-cell"><%= fmtMYR(g.invoiceMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right text-rose-500 tabular-nums hidden xl:table-cell">−<%= fmtMYR(g.shopeeFeeMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right text-rose-500 tabular-nums hidden xl:table-cell">−<%= fmtMYR(g.sstFeeMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right hidden lg:table-cell">
+                    <span class="text-slate-700 tabular-nums"><%= fmtMYR(g.holderReceivesMyr) %></span>
+                    <span class="block text-[10px] text-slate-400 tabular-nums xl:hidden mt-0.5">−<%= fmtMYR(g.shopeeFeeMyr) %> Shopee · −<%= fmtMYR(g.sstFeeMyr) %> SST</span>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-right text-slate-600 tabular-nums hidden sm:table-cell"><%= fmtMYR(g.myAdminMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right text-slate-600 tabular-nums hidden sm:table-cell"><%= fmtMYR(g.myHQMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right text-slate-600 tabular-nums hidden md:table-cell"><%= fmtMYR(g.bankHolderMyr) %></td>
+                  <td class="px-2 py-2.5 align-top text-right">
+                    <span class="font-semibold text-slate-900 tabular-nums">MYR <%= fmtMYR(g.fromHolderMyr) %></span>
+                    <span class="block text-[10.5px] text-slate-400 tabular-nums mt-0.5">~IDR <%= fmtIDR(g.fromHolderMyr * rate) %></span>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-right">
+                    <span class="font-semibold text-emerald-700 tabular-nums">MYR <%= fmtMYR(g.toIndonesiaMyr) %></span>
+                    <span class="block text-[10.5px] text-emerald-500/70 tabular-nums mt-0.5">~IDR <%= fmtIDR(g.toIndonesiaMyr * rate) %></span>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-center">
+                    <% if (g.processingCount > 0 && g.collectedCount === 0) { %>
+                      <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-200/70"><%= g.processingCount %> PENDING</span>
+                    <% } else if (g.processingCount > 0 && g.collectedCount > 0) { %>
+                      <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-200/70"><%= g.processingCount %>P · <%= g.collectedCount %>D</span>
+                    <% } else { %>
+                      <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70">COLLECTED</span>
+                    <% } %>
+                    <% if (g.delta != null && Math.abs(g.delta) > 0.01) { %>
+                      <span class="block text-[10px] mt-1 tabular-nums <%= g.delta < 0 ? 'text-rose-500' : 'text-emerald-600' %>" title="Actual − expected">Δ <%= g.delta > 0 ? '+' : '' %><%= g.delta.toFixed(2) %></span>
+                    <% } %>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-right">
+                    <% if (g.processingCount > 0) { %>
+                      <details class="inline-block relative">
+                        <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide rounded-lg shadow-sm transition">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                          COLLECT
+                        </summary>
+                        <form method="POST" action="/shopee/payouts/bulk-collect-bank"
+                              class="absolute right-0 mt-2 z-20 w-80 bg-white shadow-xl ring-1 ring-slate-200 rounded-xl p-4 space-y-3"
+                              onsubmit="return confirm('Mark all pending entries from this bank as collected?')">
+                          <% g.entries.filter(e => e.payment_status === 'processing').forEach(e => { %>
+                            <input type="hidden" name="entry_ids" value="<%= e.id %>">
+                          <% }) %>
+                          <div>
+                            <label class="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5">Actual MYR received</label>
+                            <input type="number" name="actual_total_myr" step="0.01" min="0"
+                                   value="<%= expectedNet.toFixed(2) %>" required
+                                   class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm tabular-nums focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none">
+                            <p class="text-[10px] text-slate-400 mt-1.5 tabular-nums">Expected MYR <%= fmtMYR(expectedNet) %></p>
+                          </div>
+                          <button type="submit" class="w-full px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold tracking-wide rounded-lg shadow-sm">CONFIRM COLLECTION</button>
+                        </form>
+                      </details>
+                    <% } else if (g.collectedCount > 0) { %>
+                      <span class="text-[10.5px] text-slate-400">ready to forward</span>
+                    <% } %>
+                  </td>
+                </tr>
+                <% if (g.entries.length > 1) { %>
+                  <tr class="bg-slate-50/40"><td colspan="13" class="px-3 pb-2.5 pt-0">
+                    <details class="text-[11px] text-slate-500">
+                      <summary class="cursor-pointer hover:text-slate-700 inline-block tracking-wide">▸ <%= g.entries.length %> invoices</summary>
+                      <table class="w-full mt-2 text-[10.5px] tabular-nums">
+                        <thead class="text-slate-400 uppercase tracking-wider text-[9.5px]">
+                          <tr>
+                            <th class="text-left px-2 py-1.5 font-semibold">Invoice</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">Total Sale</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">Shopee 1%</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">SST</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">Holder Receives</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">MY <%= deductions.myAdmin %>%</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">HQ <%= deductions.myHQ || 0 %>%</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">Holder <%= deductions.general %>%</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">Need to Pay</th>
+                            <th class="text-right px-2 py-1.5 font-semibold">To Indonesia</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <% g.entries.forEach(e => { const b = e.breakdown;
+                               const fh = e.actual_collected_myr != null ? parseFloat(e.actual_collected_myr) : b.needToPay;
+                               const toId = fh - b.myAdminFee - b.myHQFee - b.shopeeService - b.shopeeSST;
+                          %>
+                            <tr class="border-t border-slate-200/50">
+                              <td class="px-2 py-1.5"><a href="/shopee/payouts/<%= e.id %>" class="font-mono text-slate-700 hover:text-slate-900 hover:underline"><%= e.invoice_number || `#${e.id}` %></a></td>
+                              <td class="px-2 py-1.5 text-right text-slate-700"><%= fmtMYR(b.gross) %></td>
+                              <td class="px-2 py-1.5 text-right text-rose-500">−<%= fmtMYR(b.shopeeService) %></td>
+                              <td class="px-2 py-1.5 text-right text-rose-500">−<%= fmtMYR(b.shopeeSST) %></td>
+                              <td class="px-2 py-1.5 text-right text-slate-700"><%= fmtMYR(b.netAfterShopee) %></td>
+                              <td class="px-2 py-1.5 text-right text-slate-600"><%= fmtMYR(b.myAdminFee) %></td>
+                              <td class="px-2 py-1.5 text-right text-slate-600"><%= fmtMYR(b.myHQFee) %></td>
+                              <td class="px-2 py-1.5 text-right text-slate-600"><%= fmtMYR(b.bankHolderShare) %></td>
+                              <td class="px-2 py-1.5 text-right text-slate-900 font-semibold"><%= fmtMYR(fh) %></td>
+                              <td class="px-2 py-1.5 text-right text-emerald-700 font-semibold"><%= fmtMYR(toId) %></td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+                    </details>
+                  </td></tr>
+                <% } %>
+              <% }) %>
+            </tbody>
+            <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
+              <tr>
+                <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">Total</td>
+                <td class="px-2 py-2.5 hidden xl:table-cell"></td>
+                <td class="px-2 py-2.5 text-right text-slate-700 hidden md:table-cell"><%= fmtMYR(period.totals.invoiceMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-rose-500 hidden xl:table-cell">−<%= fmtMYR(period.totals.shopeeFeeMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-rose-500 hidden xl:table-cell">−<%= fmtMYR(period.totals.sstFeeMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-slate-700 hidden lg:table-cell"><%= fmtMYR(period.totals.holderReceivesMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-slate-700 hidden sm:table-cell"><%= fmtMYR(period.totals.myAdminMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-slate-700 hidden sm:table-cell"><%= fmtMYR(period.totals.myHQMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-slate-700 hidden md:table-cell"><%= fmtMYR(period.totals.bankHolderMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-slate-900">MYR <%= fmtMYR(period.totals.fromHolderMyr) %></td>
+                <td class="px-2 py-2.5 text-right text-emerald-700">MYR <%= fmtMYR(period.totals.toIndonesiaMyr) %></td>
+                <td class="px-2 py-2.5"></td>
+                <td class="px-2 py-2.5"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      <% } %>
+
+      <!-- ═══ ID admin / SA: incoming transfer batches ═══ -->
+      <% if ((user.role === 'indonesia_admin' || isSuperAdmin) && incomingBatches.length > 0) { %>
+        <div class="px-4 sm:px-5 pt-3 pb-1 <%= isSuperAdmin && period.banks.length > 0 ? 'border-t border-slate-100' : '' %>">
+          <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Incoming Transfers from MY Admin</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th class="text-left  px-3 py-2.5 font-semibold">Batch</th>
+                <th class="text-right px-3 py-2.5 font-semibold">Entries</th>
+                <th class="text-right px-3 py-2.5 font-semibold">From MY Admin</th>
+                <th class="text-center px-3 py-2.5 font-semibold hidden sm:table-cell">Proof</th>
+                <th class="px-3 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% incomingBatches.forEach((t, i) => { %>
+                <tr class="hover:bg-slate-50/60 transition-colors">
+                  <td class="px-3 py-2.5 text-slate-700 font-medium">Transfer #<%= i + 1 %></td>
+                  <td class="px-3 py-2.5 text-right text-slate-600 tabular-nums"><%= t.count %></td>
+                  <td class="px-3 py-2.5 text-right">
+                    <span class="font-semibold text-slate-900 tabular-nums">MYR <%= fmtMYR(t.fromMyMyr) %></span>
+                    <span class="block text-[10.5px] text-slate-400 tabular-nums mt-0.5">~IDR <%= fmtIDR(t.fromMyMyr * rate) %></span>
+                  </td>
+                  <td class="px-3 py-2.5 text-center hidden sm:table-cell">
+                    <% if (t.proof) { %>
+                      <a href="<%= t.proof %>" target="_blank" class="text-[11px] text-indigo-600 hover:underline">view</a>
+                    <% } else { %>
+                      <span class="text-slate-300">—</span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2.5 text-right">
+                    <form method="POST" action="/shopee/payouts/bulk-receive" onsubmit="return confirm('Confirm all <%= t.count %> entries as received?')">
+                      <% t.ids.forEach(id => { %><input type="hidden" name="entry_ids" value="<%= id %>"><% }) %>
+                      <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide rounded-lg shadow-sm whitespace-nowrap transition">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        CONFIRM
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <!-- ═══ ID admin / SA: studios to distribute ═══ -->
+      <% if ((user.role === 'indonesia_admin' || isSuperAdmin) && periodStudios.length > 0) { %>
+        <div class="px-4 sm:px-5 pt-3 pb-1 border-t border-slate-100">
+          <h3 class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Distribute to Studios</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th class="text-left  px-3 py-2.5 font-semibold">Studio</th>
+                <th class="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">Entries</th>
+                <th class="text-right px-3 py-2.5 font-semibold">From MY Admin</th>
+                <th class="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">ID Admin</th>
+                <th class="text-right px-3 py-2.5 font-semibold">To Studio</th>
+                <th class="px-3 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% periodStudios.forEach(s => { %>
+                <tr class="hover:bg-slate-50/60 transition-colors">
+                  <td class="px-3 py-2.5 text-slate-900 font-semibold"><%= s.studio_name %></td>
+                  <td class="px-3 py-2.5 text-right text-slate-600 tabular-nums hidden sm:table-cell"><%= s.count %></td>
+                  <td class="px-3 py-2.5 text-right text-slate-700 tabular-nums"><%= fmtMYR(s.fromMyMyr) %></td>
+                  <td class="px-3 py-2.5 text-right text-slate-600 tabular-nums hidden sm:table-cell"><%= fmtMYR(s.idAdminMyr) %></td>
+                  <td class="px-3 py-2.5 text-right">
+                    <span class="font-semibold text-emerald-700 tabular-nums">MYR <%= fmtMYR(s.toStudioMyr) %></span>
+                    <span class="block text-[10.5px] text-emerald-500/70 tabular-nums mt-0.5">~IDR <%= fmtIDR(s.toStudioMyr * rate) %></span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right">
+                    <% if (s.studio_id) { %>
+                      <a href="/shopee/payouts/studio-payments#period-<%= period.invoice_date || 'undated' %>-studio-<%= s.studio_id %>"
+                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide rounded-lg shadow-sm whitespace-nowrap transition">
+                        DISTRIBUTE
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                      </a>
+                    <% } else { %>
+                      <span class="text-[10.5px] text-slate-400">unassigned</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <!-- ═══ Studio: pipeline + per-invoice rows ═══ -->
+      <% if (isStudio && studioEntries.length > 0) {
+           // Show pending distribution proofs at top if any
+       %>
+        <% if (pendingDistroBatches.length > 0) { %>
+          <div class="px-4 sm:px-5 pt-3 pb-1 bg-orange-50/50 border-b border-orange-100">
+            <p class="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-2">Money on the way</p>
+            <% pendingDistroBatches.forEach(d => { %>
+              <div class="flex items-center justify-between py-1.5 text-[12px]">
+                <div>
+                  <span class="font-bold text-orange-700 tabular-nums">IDR <%= fmtIDR(d.totalIdr) %></span>
+                  <span class="text-slate-500"> · <%= d.count %> invoice<%= d.count === 1 ? '' : 's' %></span>
+                </div>
+                <% if (d.proof) { %>
+                  <a href="<%= d.proof %>" target="_blank" class="text-[11px] text-indigo-600 hover:underline">📎 View proof</a>
+                <% } %>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+        <!-- Pipeline stepper -->
+        <div class="px-4 sm:px-5 pt-4 pb-3">
+          <div class="flex items-center gap-1">
+            <% STAGE_BUCKETS.forEach((b, i) => {
+                 const reached    = stepProgress[i];
+                 const allReached = reached === studioTotalCount;
+                 const isActive   = i === studioActiveStep && !studioIsPaid;
+                 const dotCls = allReached
+                   ? 'bg-emerald-500 text-white'
+                   : isActive
+                     ? 'bg-slate-900 text-white ring-4 ring-slate-200'
+                     : reached > 0
+                       ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
+                       : 'bg-slate-100 text-slate-400';
+                 const labelCls = allReached
+                   ? 'text-emerald-700 font-semibold'
+                   : isActive ? 'text-slate-900 font-semibold' : 'text-slate-400';
+            %>
+              <div class="flex flex-col items-center" style="flex: 0 0 auto; min-width: 56px;">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold <%= dotCls %>">
+                  <% if (allReached) { %>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  <% } else { %>
+                    <%= i + 1 %>
+                  <% } %>
+                </div>
+                <span class="text-[9.5px] mt-1.5 tracking-wide uppercase <%= labelCls %>"><%= b.label %></span>
+                <% if (!allReached && reached > 0) { %>
+                  <span class="text-[9px] text-slate-400 tabular-nums"><%= reached %>/<%= studioTotalCount %></span>
+                <% } %>
+              </div>
+              <% if (i < STAGE_BUCKETS.length - 1) { %>
+                <div class="flex-1 h-0.5 -mt-6 <%= reached === studioTotalCount ? 'bg-emerald-300' : 'bg-slate-200' %>"></div>
+              <% } %>
+            <% }) %>
+          </div>
+        </div>
+
+        <!-- Per-invoice rows -->
+        <div class="border-t border-slate-100 overflow-x-auto">
+          <table class="w-full text-[12.5px]">
+            <thead class="bg-slate-50/60 text-slate-500 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th class="text-left  px-3 py-2 font-semibold">Account holder</th>
+                <th class="text-right px-2 py-2 font-semibold hidden sm:table-cell">Invoice MYR</th>
+                <th class="text-center px-2 py-2 font-semibold">Stage</th>
+                <th class="text-right px-3 py-2 font-semibold">Your share</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% studioEntries.forEach(e => {
+                   const b = e.breakdown;
+                   const idr = e.actual_distributed_idr != null ? parseFloat(e.actual_distributed_idr) : (b.netToStudio * rate);
+                   const stageLabel =
+                     e.payment_status === 'completed'   ? { l:'Paid',        c:'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70' }
+                   : e.payment_status === 'distributed' ? { l:'Distributed', c:'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70'   }
+                   : ['transferring','received'].includes(e.payment_status) ? { l:'In Transit', c:'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/70' }
+                   : e.payment_status === 'collected'   ? { l:'Collected',   c:'bg-amber-50 text-amber-700 ring-1 ring-amber-200/70'     }
+                   :                                      { l:'Uploaded',    c:'bg-slate-50 text-slate-600 ring-1 ring-slate-200/70'     };
+              %>
+                <tr class="hover:bg-slate-50/40 cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
+                  <td class="px-3 py-2 text-slate-700"><%= e.affiliate_name || e.extracted_name || '—' %></td>
+                  <td class="px-2 py-2 text-right text-slate-500 tabular-nums hidden sm:table-cell"><%= fmtMYR(e.payout_amount) %></td>
+                  <td class="px-2 py-2 text-center">
+                    <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide <%= stageLabel.c %>"><%= stageLabel.l.toUpperCase() %></span>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    <span class="font-semibold text-emerald-700 tabular-nums">IDR <%= fmtIDR(idr) %></span>
+                    <% if (e.actual_distributed_idr == null) { %>
+                      <span class="block text-[9.5px] text-slate-400">estimate</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      </div><!-- inner card -->
+    </details>
+
+    <!-- Transfer modal (rendered outside details so triggering it doesn't toggle the period) -->
+    <% if (showTransferBtn) { %>
+      <dialog id="<%= transferModalId %>"
+              class="rounded-2xl shadow-2xl ring-1 ring-slate-200 p-0 w-[min(92vw,28rem)] backdrop:bg-slate-900/40 backdrop:backdrop-blur-sm">
+        <form method="POST" action="/shopee/payouts/bulk-transfer-period">
+          <input type="hidden" name="invoice_date" value="<%= period.invoice_date %>">
+          <div class="px-5 pt-5 pb-3 border-b border-slate-100">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-lg bg-indigo-50 ring-1 ring-indigo-100 flex items-center justify-center shrink-0 text-indigo-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-base font-semibold text-slate-900 tracking-tight">Mark Transferred to Indonesia</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5"><%= periodCollected %> invoice<%= periodCollected === 1 ? '' : 's' %> · payout <span class="tabular-nums"><%= dateLabel %></span></p>
+              </div>
+            </div>
+          </div>
+          <div class="px-5 py-4 space-y-4">
+            <div class="bg-slate-50 ring-1 ring-slate-200/70 rounded-lg p-3 text-[12px] tabular-nums">
+              <div class="flex justify-between">
+                <span class="text-slate-500">Expected total to transfer</span>
+                <span class="font-semibold text-slate-900">MYR <%= fmtMYR(periodCollectedMyr) %></span>
+              </div>
+              <div class="flex justify-between mt-1 text-[11px]">
+                <span class="text-slate-400">~IDR estimate at system rate</span>
+                <span class="text-slate-500">~IDR <%= fmtIDR(periodCollectedMyr * rate) %></span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5">Actual MYR transferred</label>
+              <input type="number" name="actual_total_myr" step="0.01" min="0"
+                     value="<%= periodCollectedMyr.toFixed(2) %>" required
+                     class="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-base tabular-nums font-semibold focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none">
+              <p class="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                If different from expected, the shortfall or surplus will be split <span class="font-semibold">proportionally</span> across ID admin's commission and each studio's share on distribution.
+              </p>
+            </div>
+          </div>
+          <div class="px-5 pb-5 pt-2 flex flex-col sm:flex-row-reverse gap-2">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold tracking-wide uppercase rounded-lg shadow-sm">Confirm Transfer</button>
+            <button type="button"
+                    onclick="document.getElementById('<%= transferModalId %>').close()"
+                    class="px-4 py-2 text-slate-600 hover:text-slate-900 text-[11px] font-semibold tracking-wide uppercase">Cancel</button>
+          </div>
+        </form>
+      </dialog>
+    <% } %>
+  <% }); %>
+
+  <!-- ═════════════ Studio / ISH Admin: Upload card ═════════════ -->
+  <% if (isStudio || isISHAdmin) { %>
+    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5 mt-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Upload New Invoices</h3>
+        <div class="flex gap-1 text-[10px] font-semibold tracking-wide uppercase">
+          <button onclick="showTab('upload')" id="tab-upload" class="px-2.5 py-1 rounded-md bg-slate-900 text-white">PDF Upload</button>
+          <button onclick="showTab('manual')" id="tab-manual" class="px-2.5 py-1 rounded-md text-slate-500 hover:bg-slate-100">Manual</button>
+        </div>
+      </div>
+
+      <div id="panel-upload">
+        <form method="POST" action="/shopee/payouts/upload" enctype="multipart/form-data" class="space-y-2">
+          <% if (typeof studios !== 'undefined' && studios.length > 0) { %>
+            <select name="studio_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none">
+              <option value="">— Select Studio —</option>
+              <% studios.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %>
+            </select>
+          <% } %>
+          <input type="file" name="shopee_invoices" multiple accept=".pdf"
+                 class="w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:border-0 file:text-[11px] file:font-semibold file:tracking-wide file:uppercase file:bg-slate-100 file:text-slate-700 file:rounded-lg file:cursor-pointer">
+          <button type="submit" class="w-full px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide uppercase rounded-lg shadow-sm">Upload &amp; Extract</button>
+        </form>
+      </div>
+
+      <div id="panel-manual" class="hidden">
+        <form method="POST" action="/shopee/payouts/add" class="space-y-2">
+          <select name="affiliate_account_id" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none">
+            <option value="">— Select Account Holder —</option>
+            <% affiliates.forEach(a => { %><option value="<%= a.id %>"><%= a.full_name %> (<%= a.bank_name %>)</option><% }) %>
+          </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input type="number" name="payout_amount" step="0.01" required placeholder="MYR amount" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <input type="number" name="tax_amount" step="0.01" value="0" placeholder="Tax" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <input type="date" name="invoice_date" class="px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <input type="text" name="period_description" placeholder="Period description" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <button type="submit" class="w-full px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide uppercase rounded-lg shadow-sm">Add Entry</button>
+        </form>
+      </div>
+
+      <script>
+        function showTab(tab) {
+          ['upload','manual'].forEach(p => document.getElementById('panel-'+p).classList.toggle('hidden', tab !== p));
+          document.getElementById('tab-upload').className = 'px-2.5 py-1 rounded-md ' + (tab==='upload' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100');
+          document.getElementById('tab-manual').className = 'px-2.5 py-1 rounded-md ' + (tab==='manual' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100');
+        }
+      </script>
+    </div>
+  <% } %>
+
+  <!-- ═════════════ Superadmin: All entries (collapsed by default) ═════════════ -->
+  <% if (isSuperAdmin) { %>
+    <details class="mt-5 group">
+      <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between px-1 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-700">
+        <span>All Entries (<%= entries.length %>)</span>
+        <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </summary>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden mt-2">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+              <tr>
+                <th class="text-left  px-3 py-3 font-semibold">Account holder</th>
+                <th class="text-left  px-3 py-3 font-semibold hidden md:table-cell">Studio</th>
+                <th class="text-left  px-3 py-3 font-semibold hidden sm:table-cell">Date</th>
+                <th class="text-right px-3 py-3 font-semibold">Amount</th>
+                <th class="text-center px-3 py-3 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% if (entries.length === 0) { %>
+                <tr><td colspan="5" class="px-3 py-8 text-center text-slate-400">No payouts.</td></tr>
+              <% } %>
+              <% entries.forEach(e => {
+                   const colors = { processing:'bg-blue-100 text-blue-700', collected:'bg-amber-100 text-amber-700', transferring:'bg-indigo-100 text-indigo-700', received:'bg-purple-100 text-purple-700', distributed:'bg-orange-100 text-orange-700', completed:'bg-emerald-100 text-emerald-700' };
+              %>
+                <tr class="hover:bg-slate-50 cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
+                  <td class="px-3 py-3 text-slate-800"><%= e.affiliate_name || e.extracted_name || '—' %></td>
+                  <td class="px-3 py-3 text-slate-500 hidden md:table-cell"><%= e.studio_name || '—' %></td>
+                  <td class="px-3 py-3 text-slate-500 hidden sm:table-cell"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '—' %></td>
+                  <td class="px-3 py-3 text-right text-slate-700">MYR <%= fmtMYR(e.payout_amount) %></td>
+                  <td class="px-3 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-medium <%= colors[e.payment_status] %>"><%= e.payment_status %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  <% } %>
 </div>

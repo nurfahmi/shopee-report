@@ -22,9 +22,9 @@
         </div>
         <div>
           <% if (entry.affiliate_name) { %>
-            <span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">✓ Linked</span>
+            <span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium" title="Linked to an affiliate account on file">✓ Linked</span>
           <% } else { %>
-            <span class="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Unlinked</span>
+            <span class="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium" title="Manual entry — no affiliate account on file">Unlinked</span>
           <% } %>
         </div>
       </div>
@@ -34,6 +34,10 @@
           <p class="text-xs font-medium text-gray-500 mb-1">Bank Details</p>
           <p class="text-sm text-gray-800"><%= entry.bank_name %> — <%= entry.account_number %></p>
         </div>
+      <% } %>
+
+      <% if (entry.studio_name) { %>
+        <p class="text-xs text-gray-500">Studio: <span class="font-medium text-gray-800"><%= entry.studio_name %></span></p>
       <% } %>
 
       <div class="grid grid-cols-3 gap-4">
@@ -57,19 +61,25 @@
           const shopeeServiceFee = amt * 0.01;
           const shopeeSSTFee = shopeeServiceFee * 0.08;
           const netAfterShopee = amt - shopeeServiceFee - shopeeSSTFee;
-          const genDed = netAfterShopee * deductions.general / 100;
-          const myDed = netAfterShopee * deductions.myAdmin / 100;
-          const idDed = netAfterShopee * deductions.idAdmin / 100;
-          const afterMyAdmin = netAfterShopee - genDed - myDed;
-          const studioNet = netAfterShopee - genDed - myDed - idDed;
+          // All deductions are slices of GROSS (matches manual report).
+          const genDed = amt * deductions.general / 100;
+          const myDed  = amt * deductions.myAdmin / 100;
+          const hqDed  = amt * (deductions.myHQ || 0) / 100;
+          const idDed  = amt * deductions.idAdmin / 100;
+          // afterMyAdmin = what flows from MY admin to ID admin (manual convention).
+          //   = needToPay − myAdmin − myHQ − Shopee fees absorbed
+          //   ≡ gross × (100% − general% − myAdmin% − myHQ% − 1.08%) / 100
+          const needToPay    = amt - genDed;
+          const afterMyAdmin = needToPay - myDed - hqDed - shopeeServiceFee - shopeeSSTFee;
+          const studioNet    = afterMyAdmin - idDed;
         %>
 
-        <!-- Invoice Amount (all roles) -->
+        <!-- Invoice Amount -->
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p class="text-xs font-medium text-gray-500">Invoice Amount (MYR)</p>
             <p class="text-xl sm:text-2xl font-bold text-gray-800"><%= amt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
-            <p class="text-xs text-gray-400">~IDR <%= Math.round(amt * rate).toLocaleString('id-ID') %></p>
+            <p class="text-xs text-gray-400">~IDR <%= (Math.floor(Math.max(0, amt * rate) / 100) * 100).toLocaleString('id-ID') %></p>
           </div>
           <div>
             <p class="text-xs font-medium text-gray-500">Tax (MYR)</p>
@@ -77,33 +87,39 @@
           </div>
         </div>
 
-        <!-- Shopee Fees -->
-        <div class="bg-orange-50 rounded-lg p-3 mb-4 space-y-1">
-          <p class="text-xs font-semibold text-orange-700 mb-1">Shopee Platform Fees</p>
-          <div class="flex justify-between text-xs">
-            <span class="text-gray-500">Service Fee (1%)</span>
-            <span class="text-red-500">-<%= shopeeServiceFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+        <!-- Shopee Fees (hidden for studio role — they only need to see the gross invoice and what they actually received) -->
+        <% if (user.role !== 'studio') { %>
+          <div class="bg-orange-50 rounded-lg p-3 mb-4 space-y-1">
+            <p class="text-xs font-semibold text-orange-700 mb-1">Shopee Platform Fees</p>
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-500">Service Fee (1%)</span>
+              <span class="text-red-500">-<%= shopeeServiceFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-500">SST on Service Fee (8%)</span>
+              <span class="text-red-500">-<%= shopeeSSTFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-xs border-t border-orange-200 pt-1">
+              <span class="font-medium text-gray-700">Net after Shopee fees</span>
+              <span class="font-bold text-gray-800"><%= netAfterShopee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
           </div>
-          <div class="flex justify-between text-xs">
-            <span class="text-gray-500">SST on Service Fee (8%)</span>
-            <span class="text-red-500">-<%= shopeeSSTFee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-          </div>
-          <div class="flex justify-between text-xs border-t border-orange-200 pt-1">
-            <span class="font-medium text-gray-700">Net after Shopee fees</span>
-            <span class="font-bold text-gray-800"><%= netAfterShopee.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-          </div>
-        </div>
+        <% } %>
 
         <% if (user.role === 'superadmin') { %>
           <!-- Superadmin: full breakdown -->
           <div class="bg-gray-50 rounded-lg p-4 space-y-2">
             <div class="flex justify-between text-sm">
-              <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
-              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-            </div>
-            <div class="flex justify-between text-sm">
               <span class="text-gray-500">MY Admin (<%= deductions.myAdmin %>%)</span>
               <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">MY HQ (<%= deductions.myHQ || 0 %>%)</span>
+              <span class="text-red-500">-<%= hqDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Bank Holder (<%= deductions.general %>%)</span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-medium text-gray-700">Transfer to Indonesia</span>
@@ -120,15 +136,19 @@
           </div>
 
         <% } else if (user.role === 'malaysia_admin') { %>
-          <!-- MY Admin: sees general + their cut, transfer amount -->
+          <!-- MY Admin: their cut + HQ + bank holder share + transfer amount -->
           <div class="bg-gray-50 rounded-lg p-4 space-y-2">
             <div class="flex justify-between text-sm">
-              <span class="text-gray-500">General deduction (<%= deductions.general %>%)</span>
-              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+              <span class="text-gray-500">MY Admin (<%= deductions.myAdmin %>%)</span>
+              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm">
-              <span class="text-gray-500">Admin deduction (<%= deductions.myAdmin %>%)</span>
-              <span class="text-red-500">-<%= myDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+              <span class="text-gray-500">MY HQ (<%= deductions.myHQ || 0 %>%)</span>
+              <span class="text-red-500">-<%= hqDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-500">Bank Holder (<%= deductions.general %>%)</span>
+              <span class="text-red-500">-<%= genDed.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
             </div>
             <div class="flex justify-between text-sm border-t pt-2">
               <span class="font-bold text-gray-700">Transfer to Indonesia</span>
@@ -153,18 +173,42 @@
             </div>
           </div>
 
-        <% } else if (user.role === 'studio') { %>
-          <!-- Studio: sees estimated net payout only -->
-          <div class="bg-emerald-50 rounded-lg p-4">
-            <div class="flex justify-between items-center">
-              <span class="font-medium text-emerald-800">Estimated Net Payout</span>
-              <span class="text-2xl font-bold text-emerald-700">~MYR <%= studioNet.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-            </div>
-            <p class="text-xs text-emerald-600 mt-1">After all deductions · Actual may vary</p>
-          </div>
         <% } %>
 
-        <p class="text-xs text-gray-400 mt-2">Rate: 1 MYR ≈ <%= rate.toLocaleString() %> IDR · Estimated</p>
+        <% if (user.role !== 'studio') { %>
+          <p class="text-xs text-gray-400 mt-2">Rate: 1 MYR ≈ <%= rate.toLocaleString() %> IDR · Estimated<% if (rateMeta && rateMeta.updated_at) { %> · updated <%= relativeTime(rateMeta.updated_at) %><% } %></p>
+        <% } %>
+
+        <% if (entry.actual_collected_myr != null || entry.actual_distributed_idr != null) { %>
+          <div class="mt-4 bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2 text-sm">
+            <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Actual amounts</p>
+            <% if (entry.actual_collected_myr != null) {
+                 const expected = needToPay;
+                 const actual = parseFloat(entry.actual_collected_myr);
+                 const delta = actual - expected;
+            %>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Collected from bank holder</span>
+                <span class="font-semibold text-gray-800">MYR <%= actual.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+              </div>
+              <% if (Math.abs(delta) > 0.01) { %>
+                <div class="flex justify-between text-xs">
+                  <span class="text-gray-500">vs expected MYR <%= expected.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
+                  <span class="<%= delta < 0 ? 'text-red-600' : 'text-emerald-600' %> font-medium">Δ <%= delta > 0 ? '+' : '' %><%= delta.toFixed(2) %></span>
+                </div>
+              <% } %>
+            <% } %>
+            <% if (entry.actual_distributed_idr != null) { %>
+              <div class="flex justify-between border-t border-emerald-200 pt-2">
+                <span class="text-gray-600">Studio received</span>
+                <span class="font-bold text-emerald-700">IDR <%= (Math.floor(Math.max(0, parseFloat(entry.actual_distributed_idr)) / 100) * 100).toLocaleString('id-ID') %></span>
+              </div>
+              <% if (entry.actual_fx_rate) { %>
+                <p class="text-xs text-gray-500">at rate 1 MYR = <%= parseFloat(entry.actual_fx_rate).toLocaleString() %> IDR (actual transfer rate)</p>
+              <% } %>
+            <% } %>
+          </div>
+        <% } %>
       </div>
 
       <div class="border-t border-gray-200 pt-4">
@@ -227,6 +271,38 @@
           </div>
         </div>
       </div>
+
+      <% if (isISHAdmin) { %>
+        <div class="border-t border-gray-200 pt-4">
+          <p class="text-xs font-semibold text-gray-500 mb-2">Audit Trail</p>
+          <div class="space-y-1.5 text-xs">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Created by</span>
+              <span class="text-gray-800">
+                <%= entry.created_by_name || '—' %>
+                <% if (entry.created_at) { %>
+                  <span class="text-gray-400">· <%= new Date(entry.created_at).toLocaleString('en-GB') %></span>
+                <% } %>
+              </span>
+            </div>
+            <% if (entry.collected_by || entry.collected_by_name) { %>
+              <div class="flex justify-between">
+                <span class="text-gray-500">Collected by</span>
+                <span class="text-gray-800">
+                  <%= entry.collected_by_name || '—' %>
+                  <% if (entry.payment_time) { %>
+                    <span class="text-gray-400">· <%= new Date(entry.payment_time).toLocaleString('en-GB') %></span>
+                  <% } %>
+                </span>
+              </div>
+            <% } %>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Last updated</span>
+              <span class="text-gray-800"><%= entry.updated_at ? new Date(entry.updated_at).toLocaleString('en-GB') : '—' %></span>
+            </div>
+          </div>
+        </div>
+      <% } %>
     </div>
 
     <!-- Invoice PDF Preview -->
@@ -300,7 +376,13 @@
     </div>
   <% } %>
 
-  <div class="flex gap-3">
+  <div class="flex gap-3 flex-wrap">
+    <% if ((isSuperAdmin || isMYAdmin) && entry.payout_period_id) { %>
+      <a href="/shopee/payouts/report/<%= entry.payout_period_id %>" target="_blank"
+         class="px-5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-lg text-sm border border-indigo-200 transition-colors">
+        📄 Download Period Report
+      </a>
+    <% } %>
     <% if (isISHAdmin) { %>
       <form method="POST" action="/shopee/payouts/<%= entry.id %>/delete" onsubmit="return confirm('Delete this payout entry? This cannot be undone.')">
         <button class="px-5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg text-sm border border-red-200 transition-colors">Delete</button>

@@ -6,6 +6,11 @@ const Setting = {
     return rows[0]?.value ?? null;
   },
 
+  async getMeta(key) {
+    const [rows] = await db.query('SELECT `value`, updated_at FROM settings WHERE `key` = ?', [key]);
+    return rows[0] || null;
+  },
+
   async getAll() {
     const [rows] = await db.query('SELECT `key`, `value` FROM settings');
     const map = {};

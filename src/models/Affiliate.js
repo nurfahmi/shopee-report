@@ -5,10 +5,11 @@ const Affiliate = {
     const [rows] = await db.query(
       `SELECT a.*, s.name AS studio_name,
               COALESCE(p.payout_count, 0) AS payout_count,
-              COALESCE(p.payout_total, 0) AS payout_total
+              COALESCE(p.payout_total, 0) AS payout_total,
+              p.last_payout_date
        FROM affiliate_accounts a
        LEFT JOIN studios s ON a.studio_id = s.id
-       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
+       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total, MAX(invoice_date) AS last_payout_date FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
        ORDER BY a.full_name`
     );
     return rows;
@@ -41,10 +42,11 @@ const Affiliate = {
     const [rows] = await db.query(
       `SELECT a.*, s.name AS studio_name,
               COALESCE(p.payout_count, 0) AS payout_count,
-              COALESCE(p.payout_total, 0) AS payout_total
+              COALESCE(p.payout_total, 0) AS payout_total,
+              p.last_payout_date
        FROM affiliate_accounts a
        LEFT JOIN studios s ON a.studio_id = s.id
-       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
+       LEFT JOIN (SELECT affiliate_account_id, COUNT(*) AS payout_count, SUM(payout_amount) AS payout_total, MAX(invoice_date) AS last_payout_date FROM payout_entries GROUP BY affiliate_account_id) p ON p.affiliate_account_id = a.id
        WHERE a.studio_id=? ORDER BY a.full_name`, [studioId]);
     return rows;
   },

@@ -1,0 +1,439 @@
+<%
+  const fmtMYR = n => parseFloat(n||0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Floor IDR to nearest 100 — Indonesian banks don't transfer fractional rupiahs.
+  const fmtIDR = n => (Math.floor(Math.max(0, parseFloat(n||0)) / 100) * 100).toLocaleString('id-ID');
+  const fmtDate = (s) => { if (!s) return 'Undated'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
+  const BANK_FEE_IDR = (typeof bankFeeIdr === 'number') ? bankFeeIdr : 7500;
+%>
+
+<div class="max-w-6xl">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <div class="flex items-center gap-3 min-w-0">
+      <a href="/shopee/payouts" class="text-slate-400 hover:text-slate-700 shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div class="min-w-0">
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Studio Payments</h1>
+        <p class="text-slate-500 text-sm mt-1">
+          <%= periods.length %> payout period<%= periods.length === 1 ? '' : 's' %> ready to distribute
+          · <%= kpi.studioCount %> studio<%= kpi.studioCount === 1 ? '' : 's' %>
+          · <span class="tabular-nums"><%= kpi.totalEntries %></span> invoices
+        </p>
+      </div>
+    </div>
+    <% if (rateMeta && rateMeta.updated_at) { %>
+      <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium ring-1 ring-indigo-100 tabular-nums">
+        SYSTEM FX 1 MYR ≈ <%= rate.toLocaleString() %> IDR
+        <span class="text-indigo-400">· <%= relativeTime(rateMeta.updated_at) %></span>
+      </span>
+    <% } %>
+  </div>
+
+  <!-- Hero KPIs -->
+  <% if (periods.length > 0) { %>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total to Distribute</p>
+        <p class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1.5 tabular-nums">MYR <%= fmtMYR(kpi.totalToStudioMyr) %></p>
+        <p class="text-[11px] text-emerald-500/70 tabular-nums mt-1">~IDR <%= fmtIDR(kpi.totalToStudioMyr * rate) %> at system rate</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
+        <p class="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Your Commission</p>
+        <p class="text-xl sm:text-2xl font-bold text-amber-700 mt-1.5 tabular-nums">MYR <%= fmtMYR(kpi.totalIdAdminMyr) %></p>
+        <p class="text-[11px] text-amber-500/80 tabular-nums mt-1">~IDR <%= fmtIDR(kpi.totalIdAdminMyr * rate) %> · <%= deductions.idAdmin %>% of net</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
+        <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Periods Pending</p>
+        <p class="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 tabular-nums"><%= periods.length %></p>
+        <p class="text-[11px] text-slate-500 mt-1">received MYR <%= fmtMYR(kpi.totalReceivedMyr) %></p>
+      </div>
+    </div>
+  <% } %>
+
+  <!-- Recent FX rates (helper for ID admin to pick a sensible rate) -->
+  <% if (recentFxRates.length > 0) { %>
+    <div class="flex items-center gap-2 flex-wrap mb-4 text-[11px]">
+      <span class="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Recent rates used:</span>
+      <% recentFxRates.forEach(r => { %>
+        <span class="px-2 py-0.5 bg-white ring-1 ring-slate-200 rounded-md font-mono tabular-nums text-slate-700"><%= r.rate.toLocaleString() %></span>
+      <% }) %>
+      <span class="text-slate-400 text-[10px]">·</span>
+      <span class="text-slate-500 font-mono tabular-nums">system <%= rate.toLocaleString() %></span>
+    </div>
+  <% } %>
+
+  <% if (periods.length === 0) { %>
+    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-10 text-center text-slate-400 text-sm">
+      No periods waiting for distribution. Confirm incoming transfers on the
+      <a href="/shopee/payouts" class="text-indigo-600 hover:underline">Payouts page</a>.
+    </div>
+  <% } else { %>
+
+    <!-- ═════════════ Period cards (stacked) ═════════════ -->
+    <div class="space-y-3">
+      <% periods.forEach((period, pi) => {
+           const dateLabel = fmtDate(period.invoice_date);
+           const periodKey = period.invoice_date || `undated-${pi}`;
+           const formId   = `dist-form-${periodKey}`;
+           const fxInputId = `fx-${periodKey}`;
+           const idPctInputId = `idpct-${periodKey}`;
+           const defaultRate = period.lastFxRate || rate;
+           // base MYR = what landed in ID admin's hands for this period (the pool that will be split)
+           const baseMyr = period.totalReceivedMyr;
+      %>
+        <details id="period-<%= periodKey %>" class="group bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70" <%= pi === 0 ? 'open' : '' %>>
+          <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/40 rounded-xl group-open:rounded-b-none">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <svg class="w-3.5 h-3.5 text-slate-400 transition-transform group-open:rotate-90 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+              <div class="min-w-0">
+                <h2 class="text-[15px] sm:text-base font-semibold text-slate-900 tracking-tight truncate">
+                  Payout <span class="tabular-nums"><%= dateLabel %></span>
+                </h2>
+                <p class="text-[11px] text-slate-500 truncate mt-0.5">
+                  <%= period.studios.length %> studio<%= period.studios.length === 1 ? '' : 's' %>
+                  · <%= period.totalEntries %> invoice<%= period.totalEntries === 1 ? '' : 's' %>
+                  · received <span class="tabular-nums">MYR <%= fmtMYR(period.totalReceivedMyr) %></span>
+                  <% if (period.periodDescriptions.length === 1) { %> · <%= period.periodDescriptions[0] %><% } %>
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <span class="text-[11px] font-semibold text-emerald-700 tabular-nums">MYR <%= fmtMYR(period.totalToStudioMyr) %></span>
+            </div>
+          </summary>
+
+          <div class="border-t border-slate-100">
+
+          <!-- ── FX rate + ID admin % inputs (period-level) ── -->
+          <% if (period.invoice_date) { %>
+            <form id="<%= formId %>" method="POST" action="/shopee/payouts/studio-payments/period/distribute"
+                  data-base-myr="<%= baseMyr.toFixed(4) %>"
+                  data-total-received-myr="<%= period.totalReceivedMyr.toFixed(4) %>"
+                  data-total-id-admin-myr="<%= period.totalIdAdminMyr.toFixed(4) %>"
+                  data-total-to-studio-myr="<%= period.totalToStudioMyr.toFixed(4) %>"
+                  data-default-id-pct="<%= deductions.idAdmin %>"
+                  data-period="<%= periodKey %>"
+                  onsubmit="return confirm('Distribute all <%= period.totalEntries %> invoices for payout <%= dateLabel %> at the FX rate entered? This applies to <%= period.studios.length %> studio<%= period.studios.length === 1 ? '' : 's' %>.')">
+              <input type="hidden" name="invoice_date" value="<%= period.invoice_date %>">
+              <div class="px-4 sm:px-5 py-4 bg-slate-50/40 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Actual FX Rate (MYR → IDR)</label>
+                  <div class="flex gap-2">
+                    <input type="number" id="<%= fxInputId %>" name="actual_rate" step="0.000001" min="0" required
+                           value="<%= defaultRate %>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm tabular-nums focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none js-fx-input">
+                    <button type="button" data-rate="<%= rate %>" class="px-2.5 py-2 bg-white hover:bg-slate-50 text-slate-600 text-[10px] font-semibold tracking-wide uppercase rounded-lg ring-1 ring-slate-200 whitespace-nowrap js-use-system">System</button>
+                  </div>
+                  <% if (recentFxRates.length > 0) { %>
+                    <div class="flex flex-wrap gap-1 mt-1.5">
+                      <span class="text-[10px] text-slate-400">Recent:</span>
+                      <% recentFxRates.slice(0, 3).forEach(r => { %>
+                        <button type="button" data-rate="<%= r.rate %>" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 text-[10px] tabular-nums font-mono rounded ring-1 ring-slate-200 js-quick-rate"><%= r.rate.toLocaleString() %></button>
+                      <% }) %>
+                    </div>
+                  <% } %>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">ID Admin Deduction %</label>
+                  <input type="number" id="<%= idPctInputId %>" name="id_deduction_pct" step="0.01" min="0" max="100"
+                         value="<%= deductions.idAdmin %>"
+                         class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm tabular-nums focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none js-id-pct">
+                </div>
+                <div>
+                  <button type="submit" class="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-semibold tracking-wide uppercase rounded-lg shadow-sm">
+                    Distribute Period (<%= period.totalEntries %>)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live calc summary (period-wide) -->
+              <div class="px-4 sm:px-5 pb-3">
+                <div class="bg-white ring-1 ring-slate-200/70 rounded-lg p-3 text-[12px] tabular-nums grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div>
+                    <span class="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">Pool MYR</span>
+                    <p class="font-medium text-slate-700 mt-0.5">MYR <%= fmtMYR(baseMyr) %></p>
+                  </div>
+                  <div>
+                    <span class="text-amber-600 text-[10px] uppercase tracking-wider font-semibold">You earn (<span class="js-id-pct-disp"><%= deductions.idAdmin %></span>%)</span>
+                    <p class="font-medium text-amber-700 mt-0.5">~IDR <span class="js-id-earn">0</span></p>
+                  </div>
+                  <div>
+                    <span class="text-rose-500 text-[10px] uppercase tracking-wider font-semibold">Bank fee (<%= period.studios.length %>×)</span>
+                    <p class="font-medium text-rose-600 mt-0.5">−IDR <%= fmtIDR(BANK_FEE_IDR * period.studios.length) %></p>
+                  </div>
+                  <div>
+                    <span class="text-emerald-600 text-[10px] uppercase tracking-wider font-semibold">Studios receive</span>
+                    <p class="font-bold text-emerald-700 text-[13px] mt-0.5">~IDR <span class="js-studio-receive">0</span></p>
+                  </div>
+                </div>
+              </div>
+            </form>
+          <% } %>
+
+          <!-- ── Studios in this period ── -->
+          <div class="overflow-x-auto border-t border-slate-100">
+            <table class="w-full text-[13px]">
+              <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+                <tr>
+                  <th class="text-left  px-3 py-2.5 font-semibold">Studio</th>
+                  <th class="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">Entries</th>
+                  <th class="text-right px-3 py-2.5 font-semibold">To Studio (MYR)</th>
+                  <th class="text-right px-3 py-2.5 font-semibold">To Studio (IDR)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <% period.studios.forEach(s => {
+                     const hasBank = s.studio_bank_name || s.studio_bank_account_number || s.studio_bank_account_holder;
+                %>
+                  <tr class="hover:bg-slate-50/60 transition-colors" id="period-<%= periodKey %>-studio-<%= s.studio_id || 'unassigned' %>">
+                    <td class="px-3 py-2.5 align-top">
+                      <p class="font-semibold text-slate-900 leading-tight"><%= s.studio_name %></p>
+                      <% if (hasBank) { %>
+                        <div class="mt-1 flex items-start gap-1.5 text-[10.5px] leading-snug">
+                          <svg class="w-3 h-3 text-slate-400 mt-[2px] shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+                          <div class="min-w-0">
+                            <p class="text-slate-600">
+                              <% if (s.studio_bank_name) { %><span class="font-semibold"><%= s.studio_bank_name %></span><% } %>
+                              <% if (s.studio_bank_account_number) { %>
+                                <% if (s.studio_bank_name) { %> · <% } %>
+                                <button type="button" class="font-mono tabular-nums text-slate-700 hover:text-slate-900 hover:underline js-copy" data-copy="<%= s.studio_bank_account_number %>" title="Click to copy"><%= s.studio_bank_account_number %></button>
+                              <% } %>
+                            </p>
+                            <% if (s.studio_bank_account_holder) { %>
+                              <p class="text-slate-500"><%= s.studio_bank_account_holder %></p>
+                            <% } %>
+                          </div>
+                        </div>
+                      <% } else if (s.studio_id) { %>
+                        <p class="mt-1 text-[10.5px] text-amber-600">
+                          <a href="/studios/<%= s.studio_id %>/edit" class="hover:underline">⚠ Add bank details →</a>
+                        </p>
+                      <% } %>
+                      <% const sps = [...new Set(s.entries.map(e => e.period_description).filter(Boolean))]; %>
+                      <% if (sps.length > 0) { %>
+                        <p class="text-[10px] text-slate-400 mt-1"><%= sps.join(' · ') %></p>
+                      <% } %>
+                    </td>
+                    <td class="px-3 py-2.5 text-right text-slate-600 tabular-nums hidden sm:table-cell"><%= s.count %></td>
+                    <td class="px-3 py-2.5 text-right">
+                      <span class="font-semibold text-slate-900 tabular-nums js-studio-myr"
+                            data-received-myr="<%= s.receivedMyr.toFixed(4) %>"
+                            data-id-admin-myr="<%= s.idAdminMyr.toFixed(4) %>">MYR <%= fmtMYR(s.toStudioMyr) %></span>
+                    </td>
+                    <td class="px-3 py-2.5 text-right">
+                      <span class="font-semibold text-emerald-700 tabular-nums js-studio-idr"
+                            data-received-myr="<%= s.receivedMyr.toFixed(4) %>"
+                            data-id-admin-myr="<%= s.idAdminMyr.toFixed(4) %>">~IDR <%= fmtIDR(s.toStudioMyr * (period.lastFxRate || rate)) %></span>
+                    </td>
+                  </tr>
+                  <!-- Per-studio invoice details (collapsed) -->
+                  <% if (s.entries.length > 0) { %>
+                    <tr class="bg-slate-50/40">
+                      <td colspan="4" class="px-3 pb-2.5 pt-0">
+                        <details class="text-[11px] text-slate-500">
+                          <summary class="cursor-pointer hover:text-slate-700 inline-block tracking-wide">▸ <%= s.entries.length %> invoice<%= s.entries.length === 1 ? '' : 's' %></summary>
+                          <table class="w-full mt-2 text-[10.5px] tabular-nums">
+                            <thead class="text-slate-400 uppercase tracking-wider text-[9.5px]">
+                              <tr>
+                                <th class="text-left  px-2 py-1.5 font-semibold">Affiliate</th>
+                                <th class="text-left  px-2 py-1.5 font-semibold hidden md:table-cell">Bank</th>
+                                <th class="text-left  px-2 py-1.5 font-semibold hidden sm:table-cell">Invoice</th>
+                                <th class="text-right px-2 py-1.5 font-semibold">Invoice MYR</th>
+                                <th class="text-right px-2 py-1.5 font-semibold">Studio Net</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <% s.entries.forEach(e => { %>
+                                <tr class="border-t border-slate-200/50">
+                                  <td class="px-2 py-1.5"><%= e.affiliate_name || e.extracted_name || '—' %></td>
+                                  <td class="px-2 py-1.5 hidden md:table-cell text-slate-500"><%= e.bank_name || '—' %></td>
+                                  <td class="px-2 py-1.5 hidden sm:table-cell"><a href="/shopee/payouts/<%= e.id %>" class="font-mono text-slate-600 hover:text-slate-900 hover:underline"><%= e.invoice_number || `#${e.id}` %></a></td>
+                                  <td class="px-2 py-1.5 text-right text-slate-600"><%= fmtMYR(e.payout_amount) %></td>
+                                  <td class="px-2 py-1.5 text-right text-emerald-700 font-semibold"><%= fmtMYR(e.studioNet) %></td>
+                                </tr>
+                              <% }) %>
+                            </tbody>
+                          </table>
+                        </details>
+                      </td>
+                    </tr>
+                  <% } %>
+                <% }) %>
+              </tbody>
+              <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
+                <tr>
+                  <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">Total</td>
+                  <td class="px-3 py-2.5 text-right text-slate-700 hidden sm:table-cell"><%= period.totalEntries %></td>
+                  <td class="px-3 py-2.5 text-right text-slate-900 js-period-myr-total">MYR <%= fmtMYR(period.totalToStudioMyr) %></td>
+                  <td class="px-3 py-2.5 text-right text-emerald-700 js-period-idr-total">~IDR <%= fmtIDR(period.totalToStudioMyr * (period.lastFxRate || rate)) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          </div><!-- inner -->
+        </details>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       Paid History — every video paid out, grouped by earning period
+  ════════════════════════════════════════════════════════════════ -->
+  <% if (paidHistory && paidHistory.length > 0) { %>
+    <div class="mt-8">
+      <div class="flex items-baseline justify-between mb-2 px-1">
+        <h2 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Paid History</h2>
+        <span class="text-[10px] text-slate-400">last 90 days · <%= paidHistory.reduce((s, p) => s + p.entries.length, 0) %> videos</span>
+      </div>
+      <div class="space-y-2">
+        <% paidHistory.forEach((p, pi) => { %>
+          <details class="group bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+            <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 hover:bg-slate-50/40">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <svg class="w-3.5 h-3.5 text-slate-400 transition-transform group-open:rotate-90 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <div class="min-w-0">
+                  <p class="text-[13.5px] font-semibold text-slate-900 tracking-tight truncate"><%= p.periodLabel %></p>
+                  <p class="text-[10.5px] text-slate-500 tabular-nums">
+                    <%= p.entries.length %> video<%= p.entries.length === 1 ? '' : 's' %>
+                    · <%= p.studioCount %> studio<%= p.studioCount === 1 ? '' : 's' %>
+                    · last paid <%= relativeTime(p.latestDistributedAt) %>
+                  </p>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Paid out</p>
+                <p class="text-base font-bold text-emerald-700 tabular-nums">IDR <%= fmtIDR(p.totalIdr) %></p>
+              </div>
+            </summary>
+            <div class="border-t border-slate-100 overflow-x-auto">
+              <table class="w-full text-[12.5px]">
+                <thead class="bg-slate-50/60 text-slate-500 text-[10px] uppercase tracking-wider">
+                  <tr>
+                    <th class="text-left  px-3 py-2 font-semibold">Studio</th>
+                    <th class="text-left  px-2 py-2 font-semibold">Affiliate</th>
+                    <th class="text-left  px-2 py-2 font-semibold hidden md:table-cell">Invoice</th>
+                    <th class="text-right px-2 py-2 font-semibold hidden sm:table-cell">FX Rate</th>
+                    <th class="text-right px-2 py-2 font-semibold">Paid IDR</th>
+                    <th class="text-center px-2 py-2 font-semibold">Status</th>
+                    <th class="text-right px-3 py-2 font-semibold hidden sm:table-cell">Date</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <% p.entries.forEach(e => {
+                       const idr = e.actual_distributed_idr != null ? parseFloat(e.actual_distributed_idr) : 0;
+                       const cls = e.payment_status === 'completed'
+                         ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70'
+                         : 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70';
+                  %>
+                    <tr class="hover:bg-slate-50/40 cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
+                      <td class="px-3 py-2 align-top text-slate-700 font-medium"><%= e.studio_name || 'Unassigned' %></td>
+                      <td class="px-2 py-2 align-top text-slate-600 text-[11px]"><%= e.affiliate_name || e.extracted_name || '—' %></td>
+                      <td class="px-2 py-2 align-top font-mono text-[10.5px] text-slate-500 hidden md:table-cell"><%= e.invoice_number || `#${e.id}` %></td>
+                      <td class="px-2 py-2 align-top text-right font-mono text-[11px] text-slate-500 tabular-nums hidden sm:table-cell">
+                        <% if (e.actual_fx_rate) { %><%= parseFloat(e.actual_fx_rate).toLocaleString() %><% } else { %>—<% } %>
+                      </td>
+                      <td class="px-2 py-2 align-top text-right">
+                        <span class="font-semibold text-emerald-700 tabular-nums">IDR <%= fmtIDR(idr) %></span>
+                      </td>
+                      <td class="px-2 py-2 align-top text-center">
+                        <span class="px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide <%= cls %>"><%= e.payment_status.toUpperCase() %></span>
+                      </td>
+                      <td class="px-3 py-2 align-top text-right text-slate-500 text-[11px] tabular-nums whitespace-nowrap hidden sm:table-cell">
+                        <% if (e.updated_at) { const d = new Date(e.updated_at); const dd=String(d.getDate()).padStart(2,'0'); const mm=String(d.getMonth()+1).padStart(2,'0'); %><%= dd %>/<%= mm %>/<%= d.getFullYear() %><% } else { %>—<% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (periods.length > 0) { %>
+    <script>
+      // Live FX recalculation per period.
+      // ID admin commission is computed canonically as % of GROSS. studio share = received − idAdmin.
+      // Each studio's IDR amount has the bank transfer fee deducted, then floored to nearest 100
+      // (Indonesian banks don't transfer fractional rupiahs).
+      const BANK_FEE_IDR = <%= BANK_FEE_IDR %>;
+      const floorIdr = n => Math.floor(Math.max(0, n) / 100) * 100;
+      const fmtIdr = n => floorIdr(n).toLocaleString('id-ID');
+      const fmtMyr = n => Math.max(0, n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Click-to-copy for studio bank account numbers (handy for ID admin during transfer)
+      document.querySelectorAll('.js-copy').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const txt = btn.dataset.copy || '';
+          try {
+            await navigator.clipboard.writeText(txt);
+            const orig = btn.textContent;
+            btn.textContent = '✓ copied';
+            btn.classList.add('text-emerald-600');
+            setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-emerald-600'); }, 1200);
+          } catch (e) {
+            // Fallback: select for manual copy
+            const r = document.createRange(); r.selectNode(btn);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(r);
+          }
+        });
+      });
+
+      document.querySelectorAll('form[data-period]').forEach(form => {
+        const periodKey         = form.dataset.period;
+        const totalReceivedMyr  = parseFloat(form.dataset.totalReceivedMyr) || 0;
+        const totalIdAdminMyr   = parseFloat(form.dataset.totalIdAdminMyr) || 0;
+        const defaultIdPct      = parseFloat(form.dataset.defaultIdPct) || 0;
+        const fxInput   = form.querySelector('.js-fx-input');
+        const idInput   = form.querySelector('.js-id-pct');
+        const idDisp    = form.querySelector('.js-id-pct-disp');
+        const earnEl    = form.querySelector('.js-id-earn');
+        const studioEl  = form.querySelector('.js-studio-receive');
+        const card        = document.getElementById('period-' + periodKey);
+        const studioMyrCells = card ? card.querySelectorAll('.js-studio-myr') : [];
+        const studioIdrCells = card ? card.querySelectorAll('.js-studio-idr') : [];
+        const myrTotalCell   = card ? card.querySelector('.js-period-myr-total') : null;
+        const idrTotalCell   = card ? card.querySelector('.js-period-idr-total') : null;
+        const studioCount    = studioIdrCells.length;
+
+        function recalc() {
+          const r     = parseFloat(fxInput.value) || 0;
+          const idPct = parseFloat(idInput.value) || 0;
+          const scale = defaultIdPct > 0 ? idPct / defaultIdPct : 1;
+          const idAdminMyr = totalIdAdminMyr * scale;
+          const studioMyrTotal = totalReceivedMyr - idAdminMyr;
+          // After bank fee per studio, in IDR.
+          const studiosIdrAfterFee = floorIdr(studioMyrTotal * r - BANK_FEE_IDR * studioCount);
+          earnEl.textContent   = fmtIdr(idAdminMyr * r);
+          studioEl.textContent = floorIdr(studiosIdrAfterFee).toLocaleString('id-ID');
+          idDisp.textContent   = idPct;
+          // Per-studio cells: MYR is the gross share (before fee, since fee is an IDR-side charge).
+          // IDR is the actual receivable — gross MYR × FX − one bank fee, floored to 100.
+          const cellMyr = (c) => {
+            const recv       = parseFloat(c.dataset.receivedMyr) || 0;
+            const idAdminDef = parseFloat(c.dataset.idAdminMyr)  || 0;
+            return recv - idAdminDef * scale;
+          };
+          studioMyrCells.forEach(c => { c.textContent = 'MYR ' + fmtMyr(cellMyr(c)); });
+          studioIdrCells.forEach(c => {
+            const idrAfterFee = floorIdr(cellMyr(c) * r - BANK_FEE_IDR);
+            c.textContent = '~IDR ' + idrAfterFee.toLocaleString('id-ID');
+          });
+          if (myrTotalCell) myrTotalCell.textContent = 'MYR ' + fmtMyr(studioMyrTotal);
+          if (idrTotalCell) idrTotalCell.textContent = '~IDR ' + studiosIdrAfterFee.toLocaleString('id-ID');
+        }
+        fxInput.addEventListener('input', recalc);
+        idInput.addEventListener('input', recalc);
+        form.querySelectorAll('.js-use-system, .js-quick-rate').forEach(b => {
+          b.addEventListener('click', e => { fxInput.value = e.currentTarget.dataset.rate; recalc(); });
+        });
+        recalc();
+      });
+    </script>
+  <% } %>
+</div>

@@ -1,6 +1,7 @@
 <%
   const genPct = deductions.general;
-  const myPct = deductions.myAdmin;
+  const myPct  = deductions.myAdmin;
+  const hqPct  = deductions.myHQ || 0;
 %>
 <div class="max-w-5xl">
   <div class="flex items-center gap-3 mb-6">
@@ -40,6 +41,7 @@
   <% } else { %>
     <form method="POST" action="/shopee/payouts/transfer" enctype="multipart/form-data" id="bulkTransferForm">
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -47,6 +49,8 @@
                 <input type="checkbox" id="selectAll" class="rounded">
               </th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Account Holder</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Bank</th>
+              <th class="text-left px-4 py-3 font-semibold text-gray-600">Account No.</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Invoice</th>
               <th class="text-left px-4 py-3 font-semibold text-gray-600">Date</th>
               <th class="text-right px-4 py-3 font-semibold text-gray-600">Amount (MYR)</th>
@@ -57,43 +61,67 @@
             <% let grandTotal = 0; let grandTransfer = 0; %>
             <% entries.forEach(e => {
               const eAmt = parseFloat(e.payout_amount);
-              const eNet = eAmt * (1 - 0.01 - 0.01 * 0.08);
-              const eTransfer = eNet * (1 - (genPct + myPct) / 100);
+              // All deductions are slices of GROSS (matches manual report).
+              const eNet = eAmt * (1 - 0.01 - 0.01 * 0.08);  // physical receive at bank
+              const myFee = eAmt * myPct / 100;
+              const hqFee = eAmt * hqPct / 100;
+              // Expected transfer to ID (manual convention) =
+              //   gross × (100% − Shopee% − SST% − general% − myAdmin% − myHQ%)
+              const eExpectedTransfer = eAmt * (100 - 1 - 0.08 - genPct - myPct - hqPct) / 100;
+              const actualCollected = e.actual_collected_myr != null
+                ? parseFloat(e.actual_collected_myr) : null;
+              // What flows to ID = actual collected − MY/HQ cut − Shopee fees absorbed.
+              const shopeeAbsorbed = eAmt * 1.08 / 100;
+              const eTransfer = actualCollected != null
+                ? actualCollected - myFee - hqFee - shopeeAbsorbed
+                : eExpectedTransfer;
+              const usingActual = actualCollected != null;
               grandTotal += eAmt;
               grandTransfer += eTransfer;
             %>
               <tr class="hover:bg-gray-50 transition-colors entry-row">
                 <td class="px-4 py-3">
-                  <input type="checkbox" name="entry_ids" value="<%= e.id %>" class="entry-check rounded">
+                  <input type="checkbox" name="entry_ids" value="<%= e.id %>"
+                         class="entry-check rounded"
+                         data-amt="<%= eAmt %>" data-transfer="<%= eTransfer %>">
                 </td>
                 <td class="px-4 py-3 font-medium text-gray-800"><%= e.affiliate_name || e.extracted_name %></td>
+                <td class="px-4 py-3 text-gray-600 text-xs"><%= e.bank_name || '—' %></td>
+                <td class="px-4 py-3 text-gray-600 font-mono text-xs"><%= e.account_number || '—' %></td>
                 <td class="px-4 py-3 text-gray-600 font-mono text-xs"><%= e.invoice_number || '-' %></td>
                 <td class="px-4 py-3 text-gray-600"><%= e.invoice_date ? new Date(e.invoice_date).toLocaleDateString('en-GB') : '-' %></td>
                 <td class="px-4 py-3 text-right">
                   <span class="font-semibold text-gray-800"><%= eAmt.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <span class="text-xs text-gray-300 block">~IDR <%= Math.round(eAmt * rate).toLocaleString('id-ID') %></span>
+                  <span class="text-[10px] text-gray-400 block">Net after Shopee: <%= eNet.toFixed(2) %></span>
                 </td>
                 <td class="px-4 py-3 text-right">
                   <span class="font-semibold text-indigo-700"><%= eTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
                   <span class="text-xs text-indigo-400 block">~IDR <%= Math.round(eTransfer * rate).toLocaleString('id-ID') %></span>
+                  <% if (usingActual) { %>
+                    <span class="text-[10px] text-emerald-600 block">✓ uses actual collected</span>
+                  <% } else { %>
+                    <span class="text-[10px] text-gray-400 block">−<%= (genPct + myPct + hqPct).toFixed(1) %>% (expected)</span>
+                  <% } %>
                 </td>
               </tr>
             <% }) %>
           </tbody>
           <tfoot class="bg-gray-50 border-t border-gray-200">
             <tr>
-              <td colspan="4" class="px-4 py-3 font-semibold text-gray-700">Total (<span id="selectedCount"><%= entries.length %></span> selected)</td>
-              <td class="px-4 py-3 text-right">
-                <span class="font-bold text-gray-800" id="totalAmount"><%= grandTotal.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                <span class="text-xs text-gray-400 block">~IDR <%= Math.round(grandTotal * rate).toLocaleString('id-ID') %></span>
+              <td colspan="6" class="px-4 py-3 font-semibold text-gray-700">Total (<span id="selectedCount">0</span> selected)</td>
+              <td class="px-4 py-3 text-right" data-rate="<%= rate %>">
+                <span class="font-bold text-gray-800" id="totalAmount">0.00</span>
+                <span class="text-xs text-gray-400 block">~IDR <span id="totalAmountIdr">0</span></span>
               </td>
               <td class="px-4 py-3 text-right">
-                <span class="font-bold text-indigo-700" id="totalTransfer"><%= grandTransfer.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></span>
-                <span class="text-xs text-indigo-400 block">~IDR <%= Math.round(grandTransfer * rate).toLocaleString('id-ID') %></span>
+                <span class="font-bold text-indigo-700" id="totalTransfer">0.00</span>
+                <span class="text-xs text-indigo-400 block">~IDR <span id="totalTransferIdr">0</span></span>
               </td>
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
 
       <!-- Upload proof + submit -->
@@ -114,9 +142,48 @@
     </form>
 
     <script>
-      document.getElementById('selectAll').addEventListener('change', function() {
-        document.querySelectorAll('.entry-check').forEach(cb => cb.checked = this.checked);
-      });
+      (function() {
+        const rate = parseFloat(document.querySelector('[data-rate]').dataset.rate) || 1;
+        const checks = document.querySelectorAll('.entry-check');
+        const elCount = document.getElementById('selectedCount');
+        const elAmount = document.getElementById('totalAmount');
+        const elAmountIdr = document.getElementById('totalAmountIdr');
+        const elTransfer = document.getElementById('totalTransfer');
+        const elTransferIdr = document.getElementById('totalTransferIdr');
+        const fmt = n => n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtIdr = n => Math.round(n).toLocaleString('id-ID');
+
+        function recalc() {
+          let count = 0, amt = 0, xfr = 0;
+          checks.forEach(cb => {
+            if (cb.checked) {
+              count++;
+              amt += parseFloat(cb.dataset.amt) || 0;
+              xfr += parseFloat(cb.dataset.transfer) || 0;
+            }
+          });
+          elCount.textContent = count;
+          elAmount.textContent = fmt(amt);
+          elAmountIdr.textContent = fmtIdr(amt * rate);
+          elTransfer.textContent = fmt(xfr);
+          elTransferIdr.textContent = fmtIdr(xfr * rate);
+        }
+
+        document.getElementById('selectAll').addEventListener('change', function() {
+          checks.forEach(cb => cb.checked = this.checked);
+          recalc();
+        });
+        checks.forEach(cb => cb.addEventListener('change', recalc));
+
+        // If user arrived with a date filter (came from a period shortcut),
+        // pre-check every visible row so they only need to attach proof + submit.
+        const params = new URLSearchParams(window.location.search);
+        if ((params.get('from') || params.get('to')) && checks.length > 0) {
+          checks.forEach(cb => cb.checked = true);
+          document.getElementById('selectAll').checked = true;
+        }
+        recalc();
+      })();
     </script>
   <% } %>
 </div>

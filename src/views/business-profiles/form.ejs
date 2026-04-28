@@ -1,5 +1,5 @@
 <div class="max-w-xl">
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><%= editing ? 'Edit' : 'Add' %> Business Profile</h1>
+  <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-6"><%= editing ? 'Edit' : 'Add' %> Business Profile</h1>
 
   <form method="POST" action="<%= editing ? `/business-profiles/${data.id}/edit` : '/business-profiles/create' %>"
     enctype="multipart/form-data" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
@@ -21,7 +21,7 @@
       <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
       <textarea name="address" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"><%= data.address || '' %></textarea>
     </div>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
         <input type="email" name="email" value="<%= data.email || '' %>"
@@ -40,7 +40,7 @@
       <input type="text" name="bank_name" value="<%= data.bank_name || '' %>"
         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm">
     </div>
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
         <input type="text" name="bank_account_number" value="<%= data.bank_account_number || '' %>"

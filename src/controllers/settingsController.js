@@ -8,7 +8,8 @@ const settingsController = {
 
   async postSave(req, res) {
     const { myr_to_idr_rate, idr_to_myr_rate,
-            deduction_general_percent, deduction_my_admin_percent, deduction_id_admin_percent } = req.body;
+            deduction_general_percent, deduction_my_admin_percent,
+            deduction_my_hq_percent, deduction_id_admin_percent } = req.body;
 
     const updates = {
       myr_to_idr_rate: myr_to_idr_rate || '3600',
@@ -17,8 +18,9 @@ const settingsController = {
 
     // Only superadmin can update deduction percentages
     if (req.session.user.role === 'superadmin') {
-      updates.deduction_general_percent = deduction_general_percent || '0';
+      updates.deduction_general_percent  = deduction_general_percent  || '0';
       updates.deduction_my_admin_percent = deduction_my_admin_percent || '0';
+      updates.deduction_my_hq_percent    = deduction_my_hq_percent    || '0';
       updates.deduction_id_admin_percent = deduction_id_admin_percent || '0';
     }
 

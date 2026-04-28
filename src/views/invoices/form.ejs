@@ -1,5 +1,5 @@
 <div class="max-w-4xl">
-  <h1 class="text-2xl font-bold text-gray-800 mb-6"><%= editing ? 'Edit Invoice ' + invoice.invoice_number : 'New Invoice' %></h1>
+  <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-6"><%= editing ? 'Edit Invoice ' + invoice.invoice_number : 'New Invoice' %></h1>
 
   <!-- MD Import -->
   <% if (!editing) { %>
@@ -18,7 +18,7 @@
   <form method="POST" action="<%= editing ? `/invoices/${invoice.id}/edit` : '/invoices/create' %>" id="invoiceForm"
     class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
 
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
         <select name="project_id" id="projectId" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
@@ -48,7 +48,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
         <input type="date" name="issue_date" value="<%= editing ? (invoice.issue_date ? new Date(invoice.issue_date).toISOString().split('T')[0] : '') : new Date().toISOString().split('T')[0] %>" required
@@ -93,18 +93,18 @@
         <% const existingItems = editing ? items : []; %>
         <% if (existingItems.length === 0) { existingItems.push({phase_label:'',description:'',quantity:1,unit_price:0,amount:0}); } %>
         <% existingItems.forEach((it, i) => { %>
-          <div class="flex gap-2 items-start item-row">
+          <div class="flex flex-wrap gap-2 items-start item-row">
             <input type="text" name="items_phase" value="<%= it.phase_label || '' %>" placeholder="Phase"
-              class="w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              class="w-full sm:w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
             <input type="text" name="items_description" value="<%= it.description || '' %>" placeholder="Description" required
-              class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              class="w-full sm:flex-1 sm:min-w-[160px] px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
             <input type="number" name="items_qty" value="<%= it.quantity || 1 %>" step="0.01" min="0" placeholder="Qty"
-              class="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+              class="flex-1 sm:flex-none sm:w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
             <input type="number" name="items_price" value="<%= it.unit_price || 0 %>" step="0.01" placeholder="Price"
-              class="w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+              class="flex-1 sm:flex-none sm:w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
             <input type="number" name="items_amount" value="<%= it.amount || 0 %>" step="0.01" readonly
-              class="w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
-            <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2">
+              class="flex-1 sm:flex-none sm:w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
+            <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2 shrink-0">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
@@ -121,16 +121,16 @@
       <div id="milestonesContainer" class="space-y-2">
         <% const existingMs = editing ? milestones : []; %>
         <% existingMs.forEach((m, i) => { %>
-          <div class="flex gap-2 items-start ms-row">
+          <div class="flex flex-wrap gap-2 items-start ms-row">
             <input type="text" name="milestone_label" value="<%= m.label %>" placeholder="e.g. Upfront 50%"
-              class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              class="w-full sm:flex-1 sm:min-w-[160px] px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
             <input type="number" name="milestone_percent" value="<%= m.percent %>" step="0.01" placeholder="%"
-              class="w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              class="flex-1 sm:flex-none sm:w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
             <input type="number" name="milestone_amount" value="<%= m.amount %>" step="0.01" placeholder="Amount"
-              class="w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              class="flex-1 sm:flex-none sm:w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
             <input type="date" name="milestone_due" value="<%= m.due_date ? new Date(m.due_date).toISOString().split('T')[0] : '' %>"
-              class="w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-            <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2">
+              class="w-full sm:w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+            <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2 shrink-0">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
@@ -162,24 +162,24 @@
   }
 
   function addItem() {
-    const html = `<div class="flex gap-2 items-start item-row">
-      <input type="text" name="items_phase" placeholder="Phase" class="w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <input type="text" name="items_description" placeholder="Description" required class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <input type="number" name="items_qty" value="1" step="0.01" class="w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
-      <input type="number" name="items_price" value="0" step="0.01" class="w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
-      <input type="number" name="items_amount" value="0" step="0.01" readonly class="w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
-      <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    const html = `<div class="flex flex-wrap gap-2 items-start item-row">
+      <input type="text" name="items_phase" placeholder="Phase" class="w-full sm:w-28 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="text" name="items_description" placeholder="Description" required class="w-full sm:flex-1 sm:min-w-[160px] px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="items_qty" value="1" step="0.01" class="flex-1 sm:flex-none sm:w-16 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+      <input type="number" name="items_price" value="0" step="0.01" class="flex-1 sm:flex-none sm:w-24 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" onchange="calcRow(this)">
+      <input type="number" name="items_amount" value="0" step="0.01" readonly class="flex-1 sm:flex-none sm:w-24 px-2 py-2 border border-gray-200 bg-gray-50 rounded text-sm text-right font-medium">
+      <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-400 hover:text-red-600 mt-2 shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>`;
     document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
   }
 
   function addMilestone() {
-    const html = `<div class="flex gap-2 items-start ms-row">
-      <input type="text" name="milestone_label" placeholder="e.g. Upfront 50%" class="flex-1 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <input type="number" name="milestone_percent" step="0.01" placeholder="%" class="w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <input type="number" name="milestone_amount" step="0.01" placeholder="Amount" class="w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <input type="date" name="milestone_due" class="w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
-      <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    const html = `<div class="flex flex-wrap gap-2 items-start ms-row">
+      <input type="text" name="milestone_label" placeholder="e.g. Upfront 50%" class="w-full sm:flex-1 sm:min-w-[160px] px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="milestone_percent" step="0.01" placeholder="%" class="flex-1 sm:flex-none sm:w-20 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="number" name="milestone_amount" step="0.01" placeholder="Amount" class="flex-1 sm:flex-none sm:w-28 px-2 py-2 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <input type="date" name="milestone_due" class="w-full sm:w-36 px-2 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+      <button type="button" onclick="this.closest('.ms-row').remove()" class="text-red-400 hover:text-red-600 mt-2 shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>`;
     document.getElementById('milestonesContainer').insertAdjacentHTML('beforeend', html);
   }

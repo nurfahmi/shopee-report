@@ -1,7 +1,9 @@
 const Affiliate = require('../models/Affiliate');
 const Studio = require('../models/Studio');
 const Setting = require('../models/Setting');
+const PayoutEntry = require('../models/PayoutEntry');
 const { extractBankStatement } = require('../services/ocrService');
+const { breakdownEntry } = require('../services/payoutCalc');
 
 const affiliateController = {
   async index(req, res) {
@@ -9,8 +11,57 @@ const affiliateController = {
     const studioId = user.role === 'studio' ? user.studio_id : null;
     const affiliates = studioId ? await Affiliate.findByStudio(studioId) : await Affiliate.findAll();
     const studios = await Studio.findAll();
-    const rate = parseFloat(await Setting.get('myr_to_idr_rate')) || 3600;
-    res.render('shopee/affiliates/index', { title: 'Affiliate Accounts', affiliates, studios, rate, user });
+    const rateRow = await Setting.getMeta('myr_to_idr_rate');
+    const rate = parseFloat(rateRow?.value) || 3600;
+    const rateMeta = { value: rate, updated_at: rateRow?.updated_at || null };
+
+    // Per-affiliate settlement aggregates (commission kept + amount sent to MY admin)
+    const allSettings = await Setting.getAll();
+    const deductions = {
+      general: parseFloat(allSettings.deduction_general_percent || 0),
+      myAdmin: parseFloat(allSettings.deduction_my_admin_percent || 0),
+      myHQ:    parseFloat(allSettings.deduction_my_hq_percent    || 0),
+      idAdmin: parseFloat(allSettings.deduction_id_admin_percent || 0),
+    };
+    const allEntries = await PayoutEntry.findAll({ studioId, limit: 100000, offset: 0 });
+    const SENT_STATUSES = new Set(['collected','transferring','received','distributed','completed']);
+    const stats = new Map();
+    for (const e of allEntries) {
+      if (!e.affiliate_account_id) continue;
+      const b = breakdownEntry(e, deductions);
+      const sent = b.needToPay;
+      const s = stats.get(e.affiliate_account_id) || { count: 0, kept: 0, sent: 0, pending: 0, lastDate: null };
+      s.count++;
+      s.kept += b.bankHolderShare;
+      if (SENT_STATUSES.has(e.payment_status)) s.sent += (e.actual_collected_myr != null ? parseFloat(e.actual_collected_myr) : sent);
+      else s.pending += sent;
+      if (e.invoice_date && (!s.lastDate || new Date(e.invoice_date) > new Date(s.lastDate))) s.lastDate = e.invoice_date;
+      stats.set(e.affiliate_account_id, s);
+    }
+
+    const enriched = affiliates.map(a => {
+      const s = stats.get(a.id) || { count: 0, kept: 0, sent: 0, pending: 0, lastDate: null };
+      return { ...a,
+        invoiceCount: s.count,
+        holderKeptMyr: s.kept,
+        holderSentMyr: s.sent,
+        holderPendingMyr: s.pending,
+        lastPayoutDate: s.lastDate || a.last_payout_date,
+      };
+    });
+
+    // Page-level totals for the tfoot
+    const totals = enriched.reduce((t, a) => ({
+      count:   t.count   + a.invoiceCount,
+      kept:    t.kept    + a.holderKeptMyr,
+      sent:    t.sent    + a.holderSentMyr,
+      pending: t.pending + a.holderPendingMyr,
+    }), { count: 0, kept: 0, sent: 0, pending: 0 });
+
+    res.render('shopee/affiliates/index', {
+      title: 'Account Details',
+      affiliates: enriched, studios, rate, rateMeta, totals, user
+    });
   },
 
   async postUploadStatement(req, res) {

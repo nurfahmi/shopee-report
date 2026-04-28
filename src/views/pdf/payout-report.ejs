@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Payout Report — <%= period.period_number %></title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>body { font-family: 'Inter', sans-serif; }</style>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    @page { size: A4; margin: 15mm; }
+  </style>
 </head>
 <body class="bg-white text-gray-900 p-8">
-  <div class="max-w-3xl mx-auto">
+  <div class="max-w-4xl mx-auto">
     <!-- Header -->
-    <div class="flex justify-between items-start mb-8 pb-6 border-b-2 border-indigo-600">
+    <div class="flex justify-between items-start mb-6 pb-5 border-b-2 border-indigo-600">
       <div>
         <h1 class="text-2xl font-bold text-indigo-600">PAYOUT REPORT</h1>
         <p class="text-sm text-gray-500 mt-1"><%= period.period_number %></p>
@@ -18,66 +22,118 @@
       <div class="text-right">
         <p class="font-bold text-lg">Indosofthouse</p>
         <p class="text-sm text-gray-500">Malaysia / Indonesia</p>
+        <p class="text-xs text-gray-400 mt-1">FX 1 MYR ≈ <%= rate.toLocaleString() %> IDR</p>
       </div>
     </div>
 
     <!-- Period Info -->
-    <div class="grid grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-4 gap-4 mb-6">
       <div>
         <p class="text-xs text-gray-500">Period</p>
-        <p class="font-semibold"><%= period.period_label %></p>
+        <p class="font-semibold text-sm"><%= period.period_label %></p>
       </div>
       <div>
         <p class="text-xs text-gray-500">Payout Date</p>
-        <p class="font-semibold"><%= period.payout_date ? new Date(period.payout_date).toLocaleDateString('en-GB') : '-' %></p>
+        <p class="font-semibold text-sm"><%= period.payout_date ? new Date(period.payout_date).toLocaleDateString('en-GB') : '-' %></p>
       </div>
       <div>
         <p class="text-xs text-gray-500">Status</p>
-        <p class="font-semibold capitalize"><%= period.status.replace(/_/g,' ') %></p>
+        <p class="font-semibold text-sm capitalize"><%= (period.status || '').replace(/_/g,' ') %></p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">Entries</p>
+        <p class="font-semibold text-sm"><%= entries.length %></p>
       </div>
     </div>
 
+    <!-- Status totals -->
+    <% if (totals && Object.keys(totals.byStatus).length > 0) { %>
+      <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6 text-xs">
+        <% ['processing','collected','transferring','received','distributed','completed'].forEach(st => {
+             const myr = totals.byStatus[st] || 0;
+             if (myr > 0) {
+        %>
+          <div class="border border-gray-200 rounded p-2">
+            <p class="text-gray-500 capitalize"><%= st %></p>
+            <p class="font-semibold"><%= myr.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
+          </div>
+        <% } }) %>
+      </div>
+    <% } %>
+
     <!-- Entries Table -->
-    <table class="w-full text-sm mb-8">
+    <div class="overflow-x-auto">
+    <table class="w-full text-xs mb-6">
       <thead>
         <tr class="border-b-2 border-gray-300">
           <th class="text-left py-2 font-semibold">No</th>
-          <th class="text-left py-2 font-semibold">Bank Account</th>
-          <th class="text-right py-2 font-semibold">Payout Amount (MYR)</th>
+          <th class="text-left py-2 font-semibold">Account Holder</th>
+          <th class="text-left py-2 font-semibold">Bank</th>
+          <th class="text-left py-2 font-semibold">Account No.</th>
+          <th class="text-right py-2 font-semibold">Amount (MYR)</th>
           <th class="text-center py-2 font-semibold">Status</th>
           <th class="text-left py-2 font-semibold">Payment Time</th>
         </tr>
       </thead>
       <tbody>
-        <% entries.forEach((e, i) => { %>
+        <% entries.forEach((e, i) => {
+             const myr = parseFloat(e.payout_amount) || 0;
+             const idr = parseFloat(e.payout_amount_idr) || Math.round(myr * rate);
+        %>
           <tr class="border-b border-gray-200">
-            <td class="py-2"><%= i + 1 %></td>
-            <td class="py-2 font-medium"><%= e.affiliate_name || e.extracted_name || 'Unknown' %></td>
-            <td class="py-2 text-right font-medium"><%= parseFloat(e.payout_amount).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></td>
-            <td class="py-2 text-center capitalize"><%= e.payment_status %></td>
-            <td class="py-2"><%= e.payment_time ? new Date(e.payment_time).toLocaleString('en-GB') : '-' %></td>
+            <td class="py-2 align-top"><%= i + 1 %></td>
+            <td class="py-2 align-top">
+              <p class="font-medium"><%= e.affiliate_name || e.extracted_name || 'Unknown' %></p>
+              <% if (e.studio_name) { %>
+                <p class="text-[10px] text-gray-400"><%= e.studio_name %></p>
+              <% } %>
+            </td>
+            <td class="py-2 align-top text-gray-600"><%= e.bank_name || '—' %></td>
+            <td class="py-2 align-top text-gray-600 font-mono text-[10px]"><%= e.account_number || '—' %></td>
+            <td class="py-2 align-top text-right">
+              <p class="font-medium"><%= myr.toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></p>
+              <p class="text-[10px] text-gray-400">~IDR <%= idr.toLocaleString('id-ID') %></p>
+            </td>
+            <td class="py-2 align-top text-center capitalize"><%= e.payment_status %></td>
+            <td class="py-2 align-top text-gray-600"><%= e.payment_time ? new Date(e.payment_time).toLocaleString('en-GB') : '-' %></td>
           </tr>
         <% }) %>
+        <% if (entries.length === 0) { %>
+          <tr><td colspan="7" class="py-4 text-center text-gray-400">No entries in this period.</td></tr>
+        <% } %>
       </tbody>
     </table>
+    </div>
 
     <!-- Summary -->
-    <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
-      <div class="grid grid-cols-2 gap-3">
-        <div class="text-sm text-gray-600">Total Gross Payout</div>
-        <div class="text-right font-semibold">MYR <%= parseFloat(period.total_gross || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></div>
+    <div class="bg-gray-50 rounded-lg p-5 border border-gray-200">
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="text-gray-600">Total Gross Payout</div>
+        <div class="text-right font-semibold">
+          MYR <%= parseFloat(period.total_gross || totals.totalMyr || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %>
+          <span class="block text-[10px] text-gray-400">~IDR <%= Math.round(parseFloat(period.total_gross || totals.totalMyr || 0) * rate).toLocaleString('id-ID') %></span>
+        </div>
 
-        <div class="text-sm text-gray-600">Deduction (<%= period.deduction_percent || 0 %>%)</div>
-        <div class="text-right font-semibold text-red-500">- MYR <%= parseFloat(period.deduction_amount || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></div>
+        <% if (period.deduction_percent) { %>
+          <div class="text-gray-600">Deduction (<%= period.deduction_percent %>%)</div>
+          <div class="text-right font-semibold text-red-500">- MYR <%= parseFloat(period.deduction_amount || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></div>
+        <% } %>
 
         <div class="border-t border-gray-300 col-span-2 my-2"></div>
 
         <div class="text-base font-bold text-gray-800">Net Transfer to ISH</div>
-        <div class="text-right text-xl font-bold text-emerald-600">MYR <%= parseFloat(period.net_to_ish || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %></div>
+        <div class="text-right text-lg font-bold text-emerald-600">
+          MYR <%= parseFloat(period.net_to_ish || 0).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2}) %>
+          <span class="block text-[10px] text-gray-400 font-normal">~IDR <%= Math.round(parseFloat(period.net_to_ish || 0) * rate).toLocaleString('id-ID') %></span>
+        </div>
       </div>
     </div>
 
-    <p class="text-xs text-gray-400 mt-8 text-center">Generated by Shopee Report · <%= new Date().toLocaleDateString('en-GB') %></p>
+    <!-- Footer -->
+    <div class="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
+      <span>Generated <%= generatedAt ? new Date(generatedAt).toLocaleString('en-GB') : new Date().toLocaleString('en-GB') %><% if (generatedBy && generatedBy.name) { %> by <%= generatedBy.name %><% } %></span>
+      <span>Shopee Report · ISH Invoice System</span>
+    </div>
   </div>
 </body>
 </html>
