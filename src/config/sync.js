@@ -214,6 +214,7 @@ async function syncDatabase() {
     // (monthly salary). Daily lunch cashback is optional and applies to days_worked.
     `CREATE TABLE IF NOT EXISTS finance_staff (
       id                          INT AUTO_INCREMENT PRIMARY KEY,
+      studio_id                   INT NULL,
       name                        VARCHAR(150) NOT NULL,
       role_title                  VARCHAR(150) NULL,
       salary_type                 ENUM('hourly','fixed') NOT NULL DEFAULT 'hourly',
@@ -223,10 +224,12 @@ async function syncDatabase() {
       notes                       TEXT NULL,
       is_active                   TINYINT(1) NOT NULL DEFAULT 1,
       created_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY idx_finance_staff_studio (studio_id)
     )`,
     `CREATE TABLE IF NOT EXISTS finance_periods (
       id          INT AUTO_INCREMENT PRIMARY KEY,
+      studio_id   INT NULL,
       year        INT NOT NULL,
       month       TINYINT NOT NULL,
       notes       TEXT NULL,
@@ -234,7 +237,7 @@ async function syncDatabase() {
       created_by  INT NULL,
       created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_finance_year_month (year, month)
+      UNIQUE KEY uniq_finance_studio_year_month (studio_id, year, month)
     )`,
     `CREATE TABLE IF NOT EXISTS finance_staff_payouts (
       id                            INT AUTO_INCREMENT PRIMARY KEY,
@@ -316,6 +319,16 @@ async function syncDatabase() {
   await addColumnIfMissing(connection, 'studios', 'bank_name',           'VARCHAR(150) NULL AFTER name');
   await addColumnIfMissing(connection, 'studios', 'bank_account_holder', 'VARCHAR(200) NULL AFTER bank_name');
   await addColumnIfMissing(connection, 'studios', 'bank_account_number', 'VARCHAR(100) NULL AFTER bank_account_holder');
+
+  // Finance scoping: each finance_staff + finance_periods row belongs to a studio
+  // so each studio gets its own P&L (income from Shopee distributions − payroll − expenses).
+  await addColumnIfMissing(connection, 'finance_staff',   'studio_id', 'INT NULL AFTER id');
+  await addColumnIfMissing(connection, 'finance_periods', 'studio_id', 'INT NULL AFTER id');
+  // Swap the unique key from (year, month) -> (studio_id, year, month). Both wrapped
+  // in try/catch since they may already be in the desired state.
+  try { await connection.query('ALTER TABLE finance_periods DROP INDEX uniq_finance_year_month'); } catch(e) {}
+  try { await connection.query('ALTER TABLE finance_periods ADD UNIQUE KEY uniq_finance_studio_year_month (studio_id, year, month)'); } catch(e) {}
+  try { await connection.query('ALTER TABLE finance_staff   ADD KEY        idx_finance_staff_studio (studio_id)'); } catch(e) {}
 
   // Expand role ENUM to include new roles
   try {

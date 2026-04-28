@@ -1,148 +1,57 @@
 <%
   const fmtIDR = n => (Math.floor(Math.max(0, parseFloat(n||0)) / 100) * 100).toLocaleString('id-ID');
-  const monthName = (m) => new Date(2000, m-1, 1).toLocaleDateString('en-GB', { month: 'long' });
-  const currentLabel = `${monthName(currentM)} ${currentY}`;
-
-  // Aggregate KPIs across all periods
-  const totals = periods.reduce((acc, p) => ({
-    payroll:  acc.payroll  + parseFloat(p.payroll_total  || 0),
-    expenses: acc.expenses + parseFloat(p.expenses_total || 0),
-  }), { payroll: 0, expenses: 0 });
-  totals.grand = totals.payroll + totals.expenses;
-
-  // This month's KPIs
-  const cur = currentPeriod || { payroll_total: 0, expenses_total: 0, payroll_count: 0, expenses_count: 0 };
+  // Landing — pick a studio. Each card shows current month income / payroll /
+  // expenses / net P&L so admin gets a glanceable read of every studio's health.
 %>
 
 <div class="max-w-6xl">
-  <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
     <div>
-      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Finance</h1>
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Studio Finance</h1>
       <p class="text-slate-500 text-sm mt-1">
-        Studio operations · staff payroll &amp; monthly expenses (IDR)
-        · <%= activeStaff %> active staff
-        · <%= periods.length %> month<%= periods.length === 1 ? '' : 's' %> on file
+        Per-studio bookkeeping · income from Shopee distributions, staff payroll, monthly expenses (IDR)
+        · <%= currentLabel %>
       </p>
     </div>
-    <div class="flex gap-2 flex-wrap">
-      <a href="/finance/staff" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white ring-1 ring-slate-200 hover:ring-slate-300 text-slate-700 rounded-lg text-[11px] font-semibold tracking-wide uppercase transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-        Manage Staff
-      </a>
-      <a href="/finance/<%= currentY %>/<%= String(currentM).padStart(2,'0') %>" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-semibold tracking-wide uppercase shadow-sm transition whitespace-nowrap">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        Open <%= currentLabel %>
-      </a>
-    </div>
   </div>
 
-  <!-- Hero KPIs: this month -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
-      <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider"><%= currentLabel %> · Payroll</p>
-      <p class="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 tabular-nums">IDR <%= fmtIDR(cur.payroll_total) %></p>
-      <p class="text-[11px] text-slate-400 mt-1"><%= cur.payroll_count %> staff entries</p>
+  <% if (!studios.length) { %>
+    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-10 text-center text-slate-400 text-sm">
+      No studios yet. <a href="/studios/create" class="text-indigo-600 hover:underline font-semibold">Create one</a> first.
     </div>
-    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
-      <p class="text-[10px] font-semibold text-rose-600 uppercase tracking-wider"><%= currentLabel %> · Expenses</p>
-      <p class="text-xl sm:text-2xl font-bold text-rose-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(cur.expenses_total) %></p>
-      <p class="text-[11px] text-rose-500/70 mt-1"><%= cur.expenses_count %> line items</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5 ring-emerald-200">
-      <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider"><%= currentLabel %> · Total Outflow</p>
-      <p class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(parseFloat(cur.payroll_total) + parseFloat(cur.expenses_total)) %></p>
-      <p class="text-[11px] text-emerald-500/70 mt-1">payroll + expenses combined</p>
-    </div>
-  </div>
+  <% } else { %>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <% studios.forEach(s => {
+           const hasActivity = s.income > 0 || s.payroll > 0 || s.expenses > 0;
+           const netCls = s.net > 0 ? 'text-emerald-700' : s.net < 0 ? 'text-rose-700' : 'text-slate-700';
+      %>
+        <a href="/finance/<%= s.id %>" class="group bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-slate-300 p-5 block transition">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+              <h2 class="text-[16px] font-bold text-slate-900 tracking-tight truncate"><%= s.name %></h2>
+              <p class="text-[11px] text-slate-500 mt-0.5"><%= s.activeStaff %> active staff · <%= s.incomeCount %> distribution<%= s.incomeCount === 1 ? '' : 's' %> this month</p>
+            </div>
+            <span class="text-[10px] font-semibold tracking-wide uppercase text-slate-400 group-hover:text-slate-700 transition">Open →</span>
+          </div>
 
-  <!-- All months list -->
-  <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-[13px]">
-        <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
-          <tr>
-            <th class="text-left  px-3 py-2.5 font-semibold">Month</th>
-            <th class="text-right px-3 py-2.5 font-semibold">Payroll</th>
-            <th class="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">Staff</th>
-            <th class="text-right px-3 py-2.5 font-semibold">Expenses</th>
-            <th class="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">Items</th>
-            <th class="text-right px-3 py-2.5 font-semibold">Total</th>
-            <th class="px-3 py-2.5"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <% if (!periods.length) { %>
-            <tr><td colspan="7" class="px-5 py-10 text-center text-slate-400 text-sm">
-              No monthly reports yet.
-              <a href="/finance/<%= currentY %>/<%= String(currentM).padStart(2,'0') %>" class="text-indigo-600 hover:underline font-semibold">Open <%= currentLabel %></a>
-              to start.
-            </td></tr>
-          <% } %>
-          <% periods.forEach(p => {
-               const total = parseFloat(p.payroll_total || 0) + parseFloat(p.expenses_total || 0);
-               const isFinal = p.status === 'final';
-          %>
-            <tr class="hover:bg-slate-50/60 transition-colors cursor-pointer" onclick="window.location='/finance/<%= p.year %>/<%= String(p.month).padStart(2,'0') %>'">
-              <td class="px-3 py-2.5 align-top">
-                <p class="font-semibold text-slate-900 leading-tight"><%= p.label %></p>
-                <% if (isFinal) { %>
-                  <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70">FINAL</span>
-                <% } else { %>
-                  <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-semibold tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-200/70">DRAFT</span>
-                <% } %>
-              </td>
-              <td class="px-3 py-2.5 text-right text-slate-700 tabular-nums">IDR <%= fmtIDR(p.payroll_total) %></td>
-              <td class="px-3 py-2.5 text-right text-slate-500 tabular-nums hidden sm:table-cell"><%= p.payroll_count %></td>
-              <td class="px-3 py-2.5 text-right text-rose-700 tabular-nums">IDR <%= fmtIDR(p.expenses_total) %></td>
-              <td class="px-3 py-2.5 text-right text-slate-500 tabular-nums hidden sm:table-cell"><%= p.expenses_count %></td>
-              <td class="px-3 py-2.5 text-right">
-                <span class="font-semibold text-emerald-700 tabular-nums">IDR <%= fmtIDR(total) %></span>
-              </td>
-              <td class="px-3 py-2.5 text-right">
-                <a href="/finance/<%= p.year %>/<%= String(p.month).padStart(2,'0') %>" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide rounded-lg shadow-sm whitespace-nowrap transition">
-                  Open
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                </a>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-        <% if (periods.length > 1) { %>
-          <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
-            <tr>
-              <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">All-time total</td>
-              <td class="px-3 py-2.5 text-right text-slate-700">IDR <%= fmtIDR(totals.payroll) %></td>
-              <td class="px-3 py-2.5 hidden sm:table-cell"></td>
-              <td class="px-3 py-2.5 text-right text-rose-700">IDR <%= fmtIDR(totals.expenses) %></td>
-              <td class="px-3 py-2.5 hidden sm:table-cell"></td>
-              <td class="px-3 py-2.5 text-right text-emerald-700">IDR <%= fmtIDR(totals.grand) %></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        <% } %>
-      </table>
+          <div class="grid grid-cols-3 gap-3 text-[12px] tabular-nums">
+            <div>
+              <p class="text-[9.5px] font-semibold text-emerald-600 uppercase tracking-wider">Income</p>
+              <p class="text-emerald-700 font-bold mt-0.5">IDR <%= fmtIDR(s.income) %></p>
+            </div>
+            <div>
+              <p class="text-[9.5px] font-semibold text-rose-500 uppercase tracking-wider">Outflow</p>
+              <p class="text-rose-700 font-bold mt-0.5">IDR <%= fmtIDR(s.payroll + s.expenses) %></p>
+              <p class="text-[10px] text-slate-400 mt-0.5">payroll <%= s.payrollCount %> · exp <%= s.expenseCount %></p>
+            </div>
+            <div>
+              <p class="text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider">Net</p>
+              <p class="<%= netCls %> font-bold mt-0.5">IDR <%= fmtIDR(s.net) %></p>
+              <% if (!hasActivity) { %><p class="text-[10px] text-slate-400 mt-0.5">no data yet</p><% } %>
+            </div>
+          </div>
+        </a>
+      <% }) %>
     </div>
-  </div>
-
-  <!-- Open / create custom month form -->
-  <div class="mt-4 bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4">
-    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Open another month</p>
-    <form method="POST" action="/finance/period/create" class="flex flex-wrap items-end gap-2">
-      <div>
-        <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Year</label>
-        <input type="number" name="year" min="2020" max="2100" value="<%= currentY %>" required
-          class="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm tabular-nums focus:ring-2 focus:ring-slate-900 outline-none">
-      </div>
-      <div>
-        <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Month</label>
-        <select name="month" required class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-900 outline-none">
-          <% for (let i = 1; i <= 12; i++) { %>
-            <option value="<%= i %>" <%= i === currentM ? 'selected' : '' %>><%= monthName(i) %></option>
-          <% } %>
-        </select>
-      </div>
-      <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold tracking-wide uppercase rounded-lg shadow-sm">Open / Create</button>
-    </form>
-  </div>
+  <% } %>
 </div>

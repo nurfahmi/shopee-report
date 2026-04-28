@@ -3,65 +3,131 @@
   const fmtIDRRaw = n => (n == null || n === '') ? '' : (Math.floor(Math.max(0, parseFloat(n)) / 100) * 100).toLocaleString('id-ID');
   const yyyy = period.year;
   const mm   = String(period.month).padStart(2, '0');
+  const sId  = studio.id;
   const COMMON_CATEGORIES = ['Internet','Electric','Water','Rent','Office Supplies','Software','Transportation','Other'];
 
   // Today's date for expense default
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const netCls = totals.net >= 0 ? 'emerald' : 'rose';
 %>
 
 <div class="max-w-6xl">
   <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
     <div class="flex items-center gap-3 min-w-0">
-      <a href="/finance" class="text-slate-400 hover:text-slate-700 shrink-0">
+      <a href="/finance/<%= sId %>" class="text-slate-400 hover:text-slate-700 shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
       </a>
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight"><%= period.label %></h1>
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight"><%= studio.name %> · <%= period.label %></h1>
         <p class="text-slate-500 text-sm mt-1">
-          <%= staffPayouts.length %> staff
+          <%= incomeEntries.length %> distribution<%= incomeEntries.length === 1 ? '' : 's' %>
+          · <%= staffPayouts.length %> staff
           · <%= expenses.length %> expense<%= expenses.length === 1 ? '' : 's' %>
-          · status <span class="font-semibold <%= period.status === 'final' ? 'text-emerald-700' : 'text-amber-700' %>"><%= period.status %></span>
         </p>
       </div>
     </div>
     <div class="text-right">
-      <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Outflow</p>
-      <p class="text-2xl font-bold text-emerald-700 tabular-nums">IDR <%= fmtIDR(totals.grand) %></p>
+      <p class="text-[10px] font-semibold text-<%= netCls %>-600 uppercase tracking-wider">Net P&amp;L</p>
+      <p class="text-2xl font-bold text-<%= netCls %>-700 tabular-nums"><%= totals.net < 0 ? '−' : '' %>IDR <%= fmtIDR(Math.abs(totals.net)) %></p>
     </div>
   </div>
 
-  <!-- Hero KPIs -->
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+  <!-- Hero KPIs: Income · Payroll · Expenses · Net -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+    <div class="bg-white rounded-xl shadow-sm ring-1 ring-emerald-200 p-4 sm:p-5">
+      <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Income</p>
+      <p class="text-lg sm:text-xl font-bold text-emerald-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.income) %></p>
+      <p class="text-[10px] text-emerald-500/70 mt-1"><%= incomeEntries.length %> distribution<%= incomeEntries.length === 1 ? '' : 's' %></p>
+    </div>
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
       <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Payroll</p>
-      <p class="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.payroll) %></p>
-      <p class="text-[11px] text-slate-400 mt-1"><%= staffPayouts.length %> staff</p>
+      <p class="text-lg sm:text-xl font-bold text-slate-900 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.payroll) %></p>
+      <p class="text-[10px] text-slate-400 mt-1"><%= staffPayouts.length %> staff</p>
     </div>
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5">
-      <p class="text-[10px] font-semibold text-rose-600 uppercase tracking-wider">Expenses</p>
-      <p class="text-xl sm:text-2xl font-bold text-rose-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.expenses) %></p>
-      <p class="text-[11px] text-rose-500/70 mt-1"><%= expenses.length %> line items</p>
+      <p class="text-[10px] font-semibold text-rose-500 uppercase tracking-wider">Expenses</p>
+      <p class="text-lg sm:text-xl font-bold text-rose-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.expenses) %></p>
+      <p class="text-[10px] text-rose-500/70 mt-1"><%= expenses.length %> line items</p>
     </div>
-    <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-4 sm:p-5 ring-emerald-200">
-      <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Total</p>
-      <p class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1.5 tabular-nums">IDR <%= fmtIDR(totals.grand) %></p>
-      <p class="text-[11px] text-emerald-500/70 mt-1">payroll + expenses</p>
+    <div class="bg-white rounded-xl shadow-sm ring-2 ring-<%= netCls %>-300 p-4 sm:p-5">
+      <p class="text-[10px] font-semibold text-<%= netCls %>-600 uppercase tracking-wider">Net P&amp;L</p>
+      <p class="text-lg sm:text-xl font-bold text-<%= netCls %>-700 mt-1.5 tabular-nums"><%= totals.net < 0 ? '−' : '' %>IDR <%= fmtIDR(Math.abs(totals.net)) %></p>
+      <p class="text-[10px] text-slate-400 mt-1">income − payroll − expenses</p>
     </div>
+  </div>
+
+  <!-- ═══════════ INCOME (auto-pulled from Shopee distributions) ═══════════ -->
+  <div class="mb-6">
+    <h2 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
+      <span>Income — distributions received</span>
+      <span class="text-[10px] text-slate-400">auto-pulled from Shopee payouts marked distributed/completed in <%= period.label %></span>
+    </h2>
+    <% if (!incomeEntries.length) { %>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-8 text-center text-slate-400 text-sm">
+        No Shopee distributions to <%= studio.name %> in <%= period.label %> yet.
+      </div>
+    <% } else { %>
+      <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead class="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th class="text-left  px-3 py-2.5 font-semibold">Affiliate / Invoice</th>
+                <th class="text-left  px-2 py-2.5 font-semibold hidden md:table-cell">Earning Period</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">FX</th>
+                <th class="text-right px-2 py-2.5 font-semibold hidden sm:table-cell">Distributed At</th>
+                <th class="text-right px-3 py-2.5 font-semibold">Income (IDR)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% incomeEntries.forEach(e => {
+                   const dt = e.updated_at ? new Date(e.updated_at) : null;
+                   const ds = dt ? `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}` : '—';
+              %>
+                <tr class="hover:bg-slate-50/60 transition-colors cursor-pointer" onclick="window.location='/shopee/payouts/<%= e.id %>'">
+                  <td class="px-3 py-2.5 align-top">
+                    <p class="font-semibold text-slate-900 leading-tight"><%= e.affiliate_name || '—' %></p>
+                    <p class="text-[10px] text-slate-400 mt-0.5 font-mono"><%= e.invoice_number || `#${e.id}` %></p>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-[11px] text-slate-500 hidden md:table-cell"><%= e.period_description || '—' %></td>
+                  <td class="px-2 py-2.5 align-top text-right text-[11px] text-slate-500 tabular-nums hidden sm:table-cell font-mono">
+                    <% if (e.actual_fx_rate) { %><%= parseFloat(e.actual_fx_rate).toLocaleString() %><% } else { %>—<% } %>
+                  </td>
+                  <td class="px-2 py-2.5 align-top text-right text-[11px] text-slate-500 tabular-nums hidden sm:table-cell"><%= ds %></td>
+                  <td class="px-3 py-2.5 align-top text-right">
+                    <span class="font-semibold text-emerald-700 tabular-nums">IDR <%= fmtIDR(e.actual_distributed_idr) %></span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <tfoot class="bg-slate-50/80 border-t border-slate-200/70 font-semibold tabular-nums">
+              <tr>
+                <td class="px-3 py-2.5 text-slate-700 text-[11px] uppercase tracking-wider">Total Income</td>
+                <td class="px-2 py-2.5 hidden md:table-cell"></td>
+                <td class="px-2 py-2.5 hidden sm:table-cell"></td>
+                <td class="px-2 py-2.5 hidden sm:table-cell"></td>
+                <td class="px-3 py-2.5 text-right text-emerald-700">IDR <%= fmtIDR(totals.income) %></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    <% } %>
   </div>
 
   <!-- ═══════════ STAFF PAYROLL ═══════════ -->
   <div class="mb-6">
     <h2 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1 flex items-center justify-between">
       <span>Staff Payroll</span>
-      <a href="/finance/staff" class="text-[10px] text-indigo-600 hover:text-indigo-700">Manage staff →</a>
+      <a href="/finance/<%= sId %>/staff" class="text-[10px] text-indigo-600 hover:text-indigo-700">Manage staff →</a>
     </h2>
 
     <% if (!staffPayouts.length) { %>
       <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-8 text-center text-slate-400 text-sm">
         No active staff yet.
-        <a href="/finance/staff" class="text-indigo-600 hover:underline font-semibold">Add staff</a>
+        <a href="/finance/<%= sId %>/staff" class="text-indigo-600 hover:underline font-semibold">Add staff</a>
         to start tracking payouts.
       </div>
     <% } else { %>
@@ -110,7 +176,7 @@
                   </td>
                   <!-- Inline form spans the editable cells (hours, days, payout, save button) -->
                   <td class="px-2 py-2.5 align-top text-right">
-                    <form method="POST" action="/finance/<%= yyyy %>/<%= mm %>/payout" class="js-payout-form" data-staff="<%= p.staff_id %>" data-rate="<%= hr %>" data-monthly="<%= ms %>" data-cashback="<%= cb %>" data-type="<%= isHourly ? 'hourly' : 'fixed' %>">
+                    <form method="POST" action="/finance/<%= sId %>/<%= yyyy %>/<%= mm %>/payout" class="js-payout-form" data-staff="<%= p.staff_id %>" data-rate="<%= hr %>" data-monthly="<%= ms %>" data-cashback="<%= cb %>" data-type="<%= isHourly ? 'hourly' : 'fixed' %>">
                       <input type="hidden" name="staff_id" value="<%= p.staff_id %>">
                       <input type="number" name="hours_worked" step="0.5" min="0" value="<%= parseFloat(p.hours_worked || 0) %>" <%= isHourly ? '' : 'disabled' %>
                         class="w-20 px-2 py-1 border border-slate-300 rounded-md text-[12.5px] text-right tabular-nums focus:ring-2 focus:ring-slate-900 outline-none js-hours <%= isHourly ? '' : 'opacity-40' %>">
@@ -160,7 +226,7 @@
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
       <!-- Add expense form -->
       <div class="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/40">
-        <form method="POST" action="/finance/<%= yyyy %>/<%= mm %>/expense" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+        <form method="POST" action="/finance/<%= sId %>/<%= yyyy %>/<%= mm %>/expense" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
           <div class="sm:col-span-3">
             <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
             <input list="expense-categories" type="text" name="category" required placeholder="e.g. Internet"
@@ -217,7 +283,7 @@
                     <span class="font-semibold text-rose-700 tabular-nums">IDR <%= fmtIDR(e.amount_idr) %></span>
                   </td>
                   <td class="px-2 py-2.5 align-top text-right">
-                    <form method="POST" action="/finance/<%= yyyy %>/<%= mm %>/expense/<%= e.id %>/delete" onsubmit="return confirm('Delete this expense?')" class="inline">
+                    <form method="POST" action="/finance/<%= sId %>/<%= yyyy %>/<%= mm %>/expense/<%= e.id %>/delete" onsubmit="return confirm('Delete this expense?')" class="inline">
                       <button type="submit" class="text-slate-400 hover:text-rose-600 text-[11px]" title="Delete">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22m-9 0V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v2"/></svg>
                       </button>
@@ -241,13 +307,17 @@
     </div>
   </div>
 
-  <!-- Grand total banner -->
-  <div class="bg-gradient-to-br from-emerald-50 to-white ring-1 ring-emerald-200 rounded-xl p-4 sm:p-5 flex items-center justify-between">
-    <div>
-      <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Monthly Total</p>
-      <p class="text-[11px] text-slate-500 mt-0.5">payroll + expenses for <%= period.label %></p>
+  <!-- P&L summary banner -->
+  <div class="bg-gradient-to-br from-<%= netCls %>-50 to-white ring-1 ring-<%= netCls %>-200 rounded-xl p-4 sm:p-5">
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div>
+        <p class="text-[10px] font-semibold text-<%= netCls %>-600 uppercase tracking-wider"><%= studio.name %> · Net P&amp;L</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">income (IDR <%= fmtIDR(totals.income) %>) − payroll (IDR <%= fmtIDR(totals.payroll) %>) − expenses (IDR <%= fmtIDR(totals.expenses) %>)</p>
+      </div>
+      <p class="text-2xl sm:text-3xl font-bold text-<%= netCls %>-700 tabular-nums whitespace-nowrap">
+        <%= totals.net < 0 ? '−' : '' %>IDR <%= fmtIDR(Math.abs(totals.net)) %>
+      </p>
     </div>
-    <p class="text-2xl sm:text-3xl font-bold text-emerald-700 tabular-nums">IDR <%= fmtIDR(totals.grand) %></p>
   </div>
 
   <script>

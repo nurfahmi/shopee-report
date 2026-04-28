@@ -1,11 +1,11 @@
 const db = require('../config/database');
+const Studio = require('../models/Studio');
 
-// All amounts here are IDR. The finance module is for studio operations
-// (staff payroll + monthly running costs) — completely separate from the
-// Shopee payout pipeline. Access is restricted at the route layer to
-// indonesia_admin + superadmin.
+// All amounts here are IDR. The finance module is per-STUDIO bookkeeping
+// (income from Shopee distributions, staff payroll, monthly expenses) so
+// each studio's P&L can be tracked independently. Access is restricted at
+// the route layer to indonesia_admin + superadmin.
 
-// Floor IDR to nearest 100 — Indonesian banks/PBs don't transfer fractional rupiahs.
 const floorIDR = (n) => Math.floor(Math.max(0, parseFloat(n) || 0) / 100) * 100;
 
 // ── salary calc: single source of truth ────────────────────────────
@@ -22,83 +22,192 @@ function calcStaffPayout({ salary_type, hourly_rate, monthly_salary, lunch_cashb
   return base + lunchTotal;
 }
 
-const monthLabel = (y, m) => {
-  const date = new Date(y, m - 1, 1);
-  return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-};
+const monthLabel = (y, m) => new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+// Income for a studio in a given (year, month):
+// sum of actual_distributed_idr from payout entries that were marked
+// distributed/completed during that month.
+async function studioMonthIncome(studioId, year, month) {
+  const [rows] = await db.query(`
+    SELECT COALESCE(SUM(pe.actual_distributed_idr), 0) AS income_idr,
+           COUNT(*)                                     AS entry_count
+    FROM payout_entries pe
+    LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+    WHERE a.studio_id = ?
+      AND pe.payment_status IN ('distributed','completed')
+      AND pe.actual_distributed_idr IS NOT NULL
+      AND YEAR(pe.updated_at)  = ?
+      AND MONTH(pe.updated_at) = ?
+  `, [studioId, year, month]);
+  return { income: parseFloat(rows[0].income_idr) || 0, count: parseInt(rows[0].entry_count, 10) || 0 };
+}
 
 const financeController = {
-  // ── Landing page: list every monthly report + KPIs for current month ──
+  // ── Landing: studio picker + per-studio quick KPIs (this month) ──
   async index(req, res) {
-    const [periods] = await db.query(`
-      SELECT
-        fp.*,
-        COALESCE((SELECT SUM(calculated_amount_idr) FROM finance_staff_payouts WHERE finance_period_id = fp.id), 0) AS payroll_total,
-        COALESCE((SELECT COUNT(*)                    FROM finance_staff_payouts WHERE finance_period_id = fp.id), 0) AS payroll_count,
-        COALESCE((SELECT SUM(amount_idr)             FROM finance_expenses      WHERE finance_period_id = fp.id), 0) AS expenses_total,
-        COALESCE((SELECT COUNT(*)                    FROM finance_expenses      WHERE finance_period_id = fp.id), 0) AS expenses_count
-      FROM finance_periods fp
-      ORDER BY fp.year DESC, fp.month DESC
-    `);
-
-    const [staffRows] = await db.query(`SELECT COUNT(*) AS cnt FROM finance_staff WHERE is_active = 1`);
-    const activeStaff = parseInt(staffRows[0].cnt, 10) || 0;
-
+    const studios = await Studio.findAll();
     const now = new Date();
-    const currentY = now.getFullYear();
-    const currentM = now.getMonth() + 1;
-    const currentPeriod = periods.find(p => p.year === currentY && p.month === currentM) || null;
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+
+    const studioCards = await Promise.all(studios.map(async (s) => {
+      // This month's payroll + expenses
+      const [periodRows] = await db.query(
+        'SELECT id FROM finance_periods WHERE studio_id=? AND year=? AND month=?',
+        [s.id, y, m]
+      );
+      let payroll = 0, expenses = 0, payrollCount = 0, expenseCount = 0;
+      if (periodRows.length) {
+        const pid = periodRows[0].id;
+        const [[p]] = await db.query('SELECT COALESCE(SUM(calculated_amount_idr),0) v, COUNT(*) c FROM finance_staff_payouts WHERE finance_period_id=?', [pid]);
+        const [[e]] = await db.query('SELECT COALESCE(SUM(amount_idr),0) v, COUNT(*) c FROM finance_expenses WHERE finance_period_id=?', [pid]);
+        payroll = parseFloat(p.v) || 0; payrollCount = parseInt(p.c, 10) || 0;
+        expenses = parseFloat(e.v) || 0; expenseCount = parseInt(e.c, 10) || 0;
+      }
+      const inc = await studioMonthIncome(s.id, y, m);
+      const [[staffCount]] = await db.query('SELECT COUNT(*) c FROM finance_staff WHERE studio_id=? AND is_active=1', [s.id]);
+
+      return {
+        ...s,
+        income: inc.income,
+        incomeCount: inc.count,
+        payroll, payrollCount,
+        expenses, expenseCount,
+        net: inc.income - payroll - expenses,
+        activeStaff: parseInt(staffCount.c, 10) || 0,
+      };
+    }));
 
     res.render('finance/index', {
       title: 'Finance',
       user: req.session.user,
-      periods: periods.map(p => ({ ...p, label: monthLabel(p.year, p.month) })),
-      currentY, currentM,
-      currentPeriod,
-      activeStaff,
+      studios: studioCards,
+      currentY: y, currentM: m,
+      currentLabel: monthLabel(y, m),
     });
   },
 
-  // ── Create a new monthly report (or jump straight to existing one) ──
-  async postPeriodCreate(req, res) {
-    const { year, month } = req.body;
-    const y = parseInt(year, 10);
-    const m = parseInt(month, 10);
-    if (!Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) {
-      req.flash('error', 'Invalid year/month.');
-      return res.redirect('/finance');
+  // ── Per-studio finance home: list of months with P&L ──
+  async getStudio(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
+    const studio = await Studio.findById(studioId);
+    if (!studio) { req.flash('error', 'Studio not found.'); return res.redirect('/finance'); }
+
+    // Months that have ANY activity for this studio: either a finance_period row,
+    // or income (distributed/completed entries). Union them so months with only
+    // income (no manual payroll yet) still appear.
+    const [periodRows] = await db.query(`
+      SELECT fp.year, fp.month, fp.status,
+        COALESCE((SELECT SUM(calculated_amount_idr) FROM finance_staff_payouts WHERE finance_period_id = fp.id), 0) AS payroll,
+        COALESCE((SELECT SUM(amount_idr)             FROM finance_expenses      WHERE finance_period_id = fp.id), 0) AS expenses
+      FROM finance_periods fp
+      WHERE fp.studio_id = ?
+      ORDER BY fp.year DESC, fp.month DESC
+    `, [studioId]);
+
+    const [incomeRows] = await db.query(`
+      SELECT YEAR(pe.updated_at) AS year, MONTH(pe.updated_at) AS month,
+             COALESCE(SUM(pe.actual_distributed_idr), 0) AS income,
+             COUNT(*)                                     AS income_count
+      FROM payout_entries pe
+      LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+      WHERE a.studio_id = ?
+        AND pe.payment_status IN ('distributed','completed')
+        AND pe.actual_distributed_idr IS NOT NULL
+      GROUP BY YEAR(pe.updated_at), MONTH(pe.updated_at)
+      ORDER BY year DESC, month DESC
+    `, [studioId]);
+
+    // Merge into a single map keyed by year-month
+    const map = new Map();
+    for (const r of periodRows) {
+      const k = `${r.year}-${r.month}`;
+      map.set(k, {
+        year: r.year, month: r.month, status: r.status,
+        payroll: parseFloat(r.payroll) || 0,
+        expenses: parseFloat(r.expenses) || 0,
+        income: 0, income_count: 0,
+        hasReport: true,
+      });
     }
-    // Idempotent — if exists, just redirect.
-    const [existing] = await db.query('SELECT id FROM finance_periods WHERE year=? AND month=?', [y, m]);
-    if (!existing.length) {
-      await db.query('INSERT INTO finance_periods (year, month, created_by) VALUES (?, ?, ?)', [y, m, req.session.user.id]);
+    for (const r of incomeRows) {
+      const k = `${r.year}-${r.month}`;
+      const existing = map.get(k);
+      if (existing) {
+        existing.income = parseFloat(r.income) || 0;
+        existing.income_count = parseInt(r.income_count, 10) || 0;
+      } else {
+        map.set(k, {
+          year: r.year, month: r.month, status: 'draft',
+          payroll: 0, expenses: 0,
+          income: parseFloat(r.income) || 0,
+          income_count: parseInt(r.income_count, 10) || 0,
+          hasReport: false,
+        });
+      }
     }
-    res.redirect(`/finance/${y}/${String(m).padStart(2, '0')}`);
+    const months = [...map.values()]
+      .sort((a, b) => (b.year - a.year) || (b.month - a.month))
+      .map(m => ({ ...m, label: monthLabel(m.year, m.month), net: m.income - m.payroll - m.expenses }));
+
+    const totals = months.reduce((acc, m) => ({
+      income:   acc.income   + m.income,
+      payroll:  acc.payroll  + m.payroll,
+      expenses: acc.expenses + m.expenses,
+      net:      acc.net      + m.net,
+    }), { income: 0, payroll: 0, expenses: 0, net: 0 });
+
+    const now = new Date();
+    res.render('finance/studio', {
+      title: `Finance — ${studio.name}`,
+      user: req.session.user,
+      studio,
+      months,
+      totals,
+      currentY: now.getFullYear(),
+      currentM: now.getMonth() + 1,
+    });
   },
 
-  // ── Monthly report detail — staff payouts + expenses for one period ──
+  // ── Open / create monthly report for a specific studio ──
+  async postPeriodCreate(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
+    const y = parseInt(req.body.year, 10);
+    const m = parseInt(req.body.month, 10);
+    if (!studioId || !Number.isInteger(y) || y < 2000 || y > 2100 || !Number.isInteger(m) || m < 1 || m > 12) {
+      req.flash('error', 'Invalid year/month.');
+      return res.redirect(`/finance/${studioId}`);
+    }
+    const [existing] = await db.query('SELECT id FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
+    if (!existing.length) {
+      await db.query('INSERT INTO finance_periods (studio_id, year, month, created_by) VALUES (?, ?, ?, ?)', [studioId, y, m, req.session.user.id]);
+    }
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
+  },
+
+  // ── Monthly report detail ──
   async getPeriod(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const y = parseInt(req.params.year, 10);
     const m = parseInt(req.params.month, 10);
-    if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
+    if (!studioId || !Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
       req.flash('error', 'Invalid period.');
       return res.redirect('/finance');
     }
+    const studio = await Studio.findById(studioId);
+    if (!studio) { req.flash('error', 'Studio not found.'); return res.redirect('/finance'); }
 
-    // Auto-create the period if missing — friendly UX (one click "open this month").
-    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+    // Auto-create the period if missing.
+    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     if (!periodRows.length) {
-      await db.query('INSERT INTO finance_periods (year, month, created_by) VALUES (?, ?, ?)', [y, m, req.session.user.id]);
-      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+      await db.query('INSERT INTO finance_periods (studio_id, year, month, created_by) VALUES (?, ?, ?, ?)', [studioId, y, m, req.session.user.id]);
+      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     }
     const period = periodRows[0];
 
-    // Active staff — used to seed missing payout lines so ID admin doesn't have
-    // to remember every name. Each active staff gets a row (real or placeholder).
-    const [activeStaff] = await db.query('SELECT * FROM finance_staff WHERE is_active=1 ORDER BY name');
+    // Active staff for THIS studio.
+    const [activeStaff] = await db.query('SELECT * FROM finance_staff WHERE studio_id=? AND is_active=1 ORDER BY name', [studioId]);
 
-    // Existing payout lines for this period (joined with staff so we can show name + type even
-    // if the staff record was later edited).
     const [payoutRows] = await db.query(`
       SELECT fsp.*, fs.name AS staff_name, fs.role_title, fs.is_active AS staff_is_active,
              fs.salary_type AS current_salary_type,
@@ -112,32 +221,25 @@ const financeController = {
     `, [period.id]);
     const payoutByStaff = Object.fromEntries(payoutRows.map(p => [p.staff_id, p]));
 
-    // Build one row per active staff: existing payout if present, otherwise a zero placeholder.
-    const staffPayouts = activeStaff.map(s => {
-      const existing = payoutByStaff[s.id];
-      if (existing) return existing;
-      return {
-        id: null, // placeholder — no DB row yet
-        finance_period_id: period.id,
-        staff_id: s.id,
-        staff_name: s.name,
-        role_title: s.role_title,
-        staff_is_active: 1,
-        hours_worked: 0,
-        days_worked: 0,
-        salary_type_snapshot: s.salary_type,
-        hourly_rate_snapshot_idr: s.hourly_rate_idr,
-        monthly_salary_snapshot_idr: s.monthly_salary_idr,
-        lunch_cashback_snapshot_idr: s.lunch_cashback_per_day_idr,
-        calculated_amount_idr: 0,
-        current_salary_type:    s.salary_type,
-        current_hourly_rate:    s.hourly_rate_idr,
-        current_monthly_salary: s.monthly_salary_idr,
-        current_lunch_cashback: s.lunch_cashback_per_day_idr,
-      };
+    const staffPayouts = activeStaff.map(s => payoutByStaff[s.id] || {
+      id: null,
+      finance_period_id: period.id,
+      staff_id: s.id,
+      staff_name: s.name,
+      role_title: s.role_title,
+      staff_is_active: 1,
+      hours_worked: 0,
+      days_worked: 0,
+      salary_type_snapshot: s.salary_type,
+      hourly_rate_snapshot_idr: s.hourly_rate_idr,
+      monthly_salary_snapshot_idr: s.monthly_salary_idr,
+      lunch_cashback_snapshot_idr: s.lunch_cashback_per_day_idr,
+      calculated_amount_idr: 0,
+      current_salary_type:    s.salary_type,
+      current_hourly_rate:    s.hourly_rate_idr,
+      current_monthly_salary: s.monthly_salary_idr,
+      current_lunch_cashback: s.lunch_cashback_per_day_idr,
     });
-    // Plus any payout rows for staff that have since been deactivated — keep them
-    // visible so the historical record stays accurate.
     for (const p of payoutRows) {
       if (!staffPayouts.some(sp => sp.staff_id === p.staff_id)) staffPayouts.push(p);
     }
@@ -146,25 +248,44 @@ const financeController = {
       SELECT * FROM finance_expenses WHERE finance_period_id = ? ORDER BY expense_date DESC, id DESC
     `, [period.id]);
 
+    // Per-month income from Shopee distributions for this studio + entries breakdown
+    const [incomeEntries] = await db.query(`
+      SELECT pe.id, pe.actual_distributed_idr, pe.actual_fx_rate, pe.invoice_date,
+             pe.invoice_number, pe.period_description, pe.updated_at,
+             pe.payment_status, a.full_name AS affiliate_name
+      FROM payout_entries pe
+      LEFT JOIN affiliate_accounts a ON pe.affiliate_account_id = a.id
+      WHERE a.studio_id = ?
+        AND pe.payment_status IN ('distributed','completed')
+        AND pe.actual_distributed_idr IS NOT NULL
+        AND YEAR(pe.updated_at) = ?
+        AND MONTH(pe.updated_at) = ?
+      ORDER BY pe.updated_at DESC
+    `, [studioId, y, m]);
+    const income = incomeEntries.reduce((s, e) => s + parseFloat(e.actual_distributed_idr || 0), 0);
+
     const totals = {
-      payroll: staffPayouts.reduce((s, p) => s + parseFloat(p.calculated_amount_idr || 0), 0),
+      income,
+      payroll:  staffPayouts.reduce((s, p) => s + parseFloat(p.calculated_amount_idr || 0), 0),
       expenses: expenses.reduce((s, e) => s + parseFloat(e.amount_idr || 0), 0),
     };
-    totals.grand = totals.payroll + totals.expenses;
+    totals.outflow = totals.payroll + totals.expenses;
+    totals.net     = totals.income - totals.outflow;
 
     res.render('finance/period', {
-      title: `Finance — ${monthLabel(y, m)}`,
+      title: `${studio.name} — ${monthLabel(y, m)}`,
       user: req.session.user,
+      studio,
       period: { ...period, label: monthLabel(y, m) },
       staffPayouts,
       expenses,
+      incomeEntries,
       totals,
     });
   },
 
-  // ── Upsert one staff payout line (hours + days) ──
-  // POST /finance/:year/:month/payout
   async postPayoutUpsert(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const y = parseInt(req.params.year, 10);
     const m = parseInt(req.params.month, 10);
     const staffId = parseInt(req.body.staff_id, 10);
@@ -172,27 +293,24 @@ const financeController = {
     const days    = parseInt(req.body.days_worked, 10) || 0;
     const notes   = (req.body.notes || '').trim() || null;
 
-    if (!Number.isInteger(y) || !Number.isInteger(m) || !staffId) {
+    if (!studioId || !Number.isInteger(y) || !Number.isInteger(m) || !staffId) {
       req.flash('error', 'Invalid form data.');
-      return res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+      return res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
     }
-
-    const [staffRows] = await db.query('SELECT * FROM finance_staff WHERE id=?', [staffId]);
+    const [staffRows] = await db.query('SELECT * FROM finance_staff WHERE id=? AND studio_id=?', [staffId, studioId]);
     if (!staffRows.length) {
-      req.flash('error', 'Staff not found.');
-      return res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+      req.flash('error', 'Staff not found in this studio.');
+      return res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
     }
     const staff = staffRows[0];
 
-    // Find or create the period.
-    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     if (!periodRows.length) {
-      await db.query('INSERT INTO finance_periods (year, month, created_by) VALUES (?, ?, ?)', [y, m, req.session.user.id]);
-      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+      await db.query('INSERT INTO finance_periods (studio_id, year, month, created_by) VALUES (?, ?, ?, ?)', [studioId, y, m, req.session.user.id]);
+      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     }
     const period = periodRows[0];
 
-    // Snapshot the current rate so historical reports don't mutate when staff settings change.
     const calculated = floorIDR(calcStaffPayout({
       salary_type:    staff.salary_type,
       hourly_rate:    staff.hourly_rate_idr,
@@ -223,22 +341,22 @@ const financeController = {
     ]);
 
     req.flash('success', `Saved ${staff.name} payout — IDR ${calculated.toLocaleString('id-ID')}.`);
-    res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
   },
 
-  // ── Add expense ──
   async postExpenseCreate(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const y = parseInt(req.params.year, 10);
     const m = parseInt(req.params.month, 10);
     const { category, description, amount_idr, expense_date } = req.body;
     if (!category || !amount_idr) {
       req.flash('error', 'Category and amount are required.');
-      return res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+      return res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
     }
-    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     if (!periodRows.length) {
-      await db.query('INSERT INTO finance_periods (year, month, created_by) VALUES (?, ?, ?)', [y, m, req.session.user.id]);
-      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE year=? AND month=?', [y, m]);
+      await db.query('INSERT INTO finance_periods (studio_id, year, month, created_by) VALUES (?, ?, ?, ?)', [studioId, y, m, req.session.user.id]);
+      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
     }
     const period = periodRows[0];
     const amount = floorIDR(amount_idr);
@@ -248,38 +366,45 @@ const financeController = {
       VALUES (?, ?, ?, ?, ?)
     `, [period.id, category.trim(), (description || '').trim() || null, amount, date]);
     req.flash('success', `Expense added — ${category} IDR ${amount.toLocaleString('id-ID')}.`);
-    res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
   },
 
   async postExpenseDelete(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const y = parseInt(req.params.year, 10);
     const m = parseInt(req.params.month, 10);
     const id = parseInt(req.params.id, 10);
     await db.query('DELETE FROM finance_expenses WHERE id=?', [id]);
     req.flash('success', 'Expense deleted.');
-    res.redirect(`/finance/${y}/${String(m).padStart(2,'0')}`);
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
   },
 
-  // ── Staff management ──
+  // ── Staff management (per-studio) ──
   async getStaff(req, res) {
-    const [staff] = await db.query('SELECT * FROM finance_staff ORDER BY is_active DESC, name');
+    const studioId = parseInt(req.params.studioId, 10);
+    const studio = await Studio.findById(studioId);
+    if (!studio) { req.flash('error', 'Studio not found.'); return res.redirect('/finance'); }
+    const [staff] = await db.query('SELECT * FROM finance_staff WHERE studio_id=? ORDER BY is_active DESC, name', [studioId]);
     res.render('finance/staff', {
-      title: 'Finance — Staff',
+      title: `${studio.name} — Staff`,
       user: req.session.user,
+      studio,
       staff,
     });
   },
 
   async postStaffCreate(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes } = req.body;
-    if (!name || !['hourly','fixed'].includes(salary_type)) {
+    if (!studioId || !name || !['hourly','fixed'].includes(salary_type)) {
       req.flash('error', 'Name and a valid salary type are required.');
-      return res.redirect('/finance/staff');
+      return res.redirect(`/finance/${studioId}/staff`);
     }
     await db.query(`
-      INSERT INTO finance_staff (name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO finance_staff (studio_id, name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
+      studioId,
       name.trim(),
       (role_title || '').trim() || null,
       salary_type,
@@ -289,21 +414,22 @@ const financeController = {
       (notes || '').trim() || null,
     ]);
     req.flash('success', `${name} added.`);
-    res.redirect('/finance/staff');
+    res.redirect(`/finance/${studioId}/staff`);
   },
 
   async postStaffUpdate(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const id = parseInt(req.params.id, 10);
     const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes, is_active } = req.body;
     if (!name || !['hourly','fixed'].includes(salary_type)) {
       req.flash('error', 'Name and a valid salary type are required.');
-      return res.redirect('/finance/staff');
+      return res.redirect(`/finance/${studioId}/staff`);
     }
     await db.query(`
       UPDATE finance_staff
       SET name=?, role_title=?, salary_type=?, hourly_rate_idr=?, monthly_salary_idr=?,
           lunch_cashback_per_day_idr=?, notes=?, is_active=?
-      WHERE id=?
+      WHERE id=? AND studio_id=?
     `, [
       name.trim(),
       (role_title || '').trim() || null,
@@ -313,18 +439,18 @@ const financeController = {
       lunch_cashback_per_day_idr ? (parseFloat(lunch_cashback_per_day_idr) || 0) : null,
       (notes || '').trim() || null,
       is_active ? 1 : 0,
-      id,
+      id, studioId,
     ]);
     req.flash('success', `${name} updated.`);
-    res.redirect('/finance/staff');
+    res.redirect(`/finance/${studioId}/staff`);
   },
 
   async postStaffDelete(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
     const id = parseInt(req.params.id, 10);
-    // Soft delete by deactivating — preserves historical payout snapshots.
-    await db.query('UPDATE finance_staff SET is_active=0 WHERE id=?', [id]);
+    await db.query('UPDATE finance_staff SET is_active=0 WHERE id=? AND studio_id=?', [id, studioId]);
     req.flash('success', 'Staff deactivated (history preserved).');
-    res.redirect('/finance/staff');
+    res.redirect(`/finance/${studioId}/staff`);
   },
 };
 
