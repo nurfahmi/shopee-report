@@ -268,6 +268,20 @@ async function syncDatabase() {
       created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (finance_period_id) REFERENCES finance_periods(id) ON DELETE CASCADE
+    )`,
+    // Other income — revenue streams beyond Shopee distributions (e.g. AdSense,
+    // sponsorships, brand deals). Manually entered per period.
+    `CREATE TABLE IF NOT EXISTS finance_other_income (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      finance_period_id INT NOT NULL,
+      source            VARCHAR(100) NOT NULL,
+      description       VARCHAR(500) NULL,
+      amount_idr        DECIMAL(15,2) NOT NULL DEFAULT 0,
+      income_date       DATE NULL,
+      notes             TEXT NULL,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (finance_period_id) REFERENCES finance_periods(id) ON DELETE CASCADE
     )`
   ];
 

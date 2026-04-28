@@ -22,6 +22,8 @@ router.post('/:studioId/period/create',                                 financeC
 router.post('/:studioId/:year/:month/payout',                           financeController.postPayoutUpsert);
 router.post('/:studioId/:year/:month/expense',                          financeController.postExpenseCreate);
 router.post('/:studioId/:year/:month/expense/:id/delete',               financeController.postExpenseDelete);
+router.post('/:studioId/:year/:month/income',                           financeController.postOtherIncomeCreate);
+router.post('/:studioId/:year/:month/income/:id/delete',                financeController.postOtherIncomeDelete);
 router.get('/:studioId/:year/:month',                                   financeController.getPeriod);
 router.get('/:studioId',                                                financeController.getStudio);
 

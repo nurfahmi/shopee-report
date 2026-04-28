@@ -84,7 +84,10 @@
                 <td class="px-3 py-2.5 align-top">
                   <p class="font-semibold text-slate-900 leading-tight"><%= m.label %></p>
                   <p class="text-[10px] text-slate-500 mt-0.5">
-                    <% if (m.income_count > 0) { %><%= m.income_count %> distribution<%= m.income_count === 1 ? '' : 's' %><% } else if (!m.hasReport) { %>income only<% } %>
+                    <% if (m.shopeeCount > 0) { %><%= m.shopeeCount %> Shopee<% } %>
+                    <% if (m.shopeeCount > 0 && m.otherIncome > 0) { %> · <% } %>
+                    <% if (m.otherIncome > 0) { %>+ other income<% } %>
+                    <% if (!m.shopeeCount && !m.otherIncome && !m.hasReport) { %>income only<% } %>
                   </p>
                 </td>
                 <td class="px-3 py-2.5 text-right text-emerald-700 font-semibold tabular-nums">IDR <%= fmtIDR(m.income) %></td>

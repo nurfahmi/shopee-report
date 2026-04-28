@@ -24,10 +24,10 @@ function calcStaffPayout({ salary_type, hourly_rate, monthly_salary, lunch_cashb
 
 const monthLabel = (y, m) => new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-// Income for a studio in a given (year, month):
+// Shopee income for a studio in a given (year, month):
 // sum of actual_distributed_idr from payout entries that were marked
 // distributed/completed during that month.
-async function studioMonthIncome(studioId, year, month) {
+async function studioMonthShopeeIncome(studioId, year, month) {
   const [rows] = await db.query(`
     SELECT COALESCE(SUM(pe.actual_distributed_idr), 0) AS income_idr,
            COUNT(*)                                     AS entry_count
@@ -51,29 +51,35 @@ const financeController = {
     const m = now.getMonth() + 1;
 
     const studioCards = await Promise.all(studios.map(async (s) => {
-      // This month's payroll + expenses
+      // This month's payroll + expenses + other income
       const [periodRows] = await db.query(
         'SELECT id FROM finance_periods WHERE studio_id=? AND year=? AND month=?',
         [s.id, y, m]
       );
-      let payroll = 0, expenses = 0, payrollCount = 0, expenseCount = 0;
+      let payroll = 0, expenses = 0, otherIncome = 0, payrollCount = 0, expenseCount = 0, otherIncomeCount = 0;
       if (periodRows.length) {
         const pid = periodRows[0].id;
-        const [[p]] = await db.query('SELECT COALESCE(SUM(calculated_amount_idr),0) v, COUNT(*) c FROM finance_staff_payouts WHERE finance_period_id=?', [pid]);
-        const [[e]] = await db.query('SELECT COALESCE(SUM(amount_idr),0) v, COUNT(*) c FROM finance_expenses WHERE finance_period_id=?', [pid]);
-        payroll = parseFloat(p.v) || 0; payrollCount = parseInt(p.c, 10) || 0;
-        expenses = parseFloat(e.v) || 0; expenseCount = parseInt(e.c, 10) || 0;
+        const [[p]]  = await db.query('SELECT COALESCE(SUM(calculated_amount_idr),0) v, COUNT(*) c FROM finance_staff_payouts WHERE finance_period_id=?', [pid]);
+        const [[e]]  = await db.query('SELECT COALESCE(SUM(amount_idr),0) v, COUNT(*) c FROM finance_expenses      WHERE finance_period_id=?', [pid]);
+        const [[oi]] = await db.query('SELECT COALESCE(SUM(amount_idr),0) v, COUNT(*) c FROM finance_other_income  WHERE finance_period_id=?', [pid]);
+        payroll = parseFloat(p.v)  || 0; payrollCount     = parseInt(p.c, 10)  || 0;
+        expenses = parseFloat(e.v) || 0; expenseCount     = parseInt(e.c, 10)  || 0;
+        otherIncome = parseFloat(oi.v) || 0; otherIncomeCount = parseInt(oi.c, 10) || 0;
       }
-      const inc = await studioMonthIncome(s.id, y, m);
+      const shopee = await studioMonthShopeeIncome(s.id, y, m);
       const [[staffCount]] = await db.query('SELECT COUNT(*) c FROM finance_staff WHERE studio_id=? AND is_active=1', [s.id]);
 
+      const totalIncome = shopee.income + otherIncome;
       return {
         ...s,
-        income: inc.income,
-        incomeCount: inc.count,
+        shopeeIncome: shopee.income,
+        shopeeIncomeCount: shopee.count,
+        otherIncome, otherIncomeCount,
+        income: totalIncome,
+        incomeCount: shopee.count + otherIncomeCount,
         payroll, payrollCount,
         expenses, expenseCount,
-        net: inc.income - payroll - expenses,
+        net: totalIncome - payroll - expenses,
         activeStaff: parseInt(staffCount.c, 10) || 0,
       };
     }));
@@ -99,7 +105,8 @@ const financeController = {
     const [periodRows] = await db.query(`
       SELECT fp.year, fp.month, fp.status,
         COALESCE((SELECT SUM(calculated_amount_idr) FROM finance_staff_payouts WHERE finance_period_id = fp.id), 0) AS payroll,
-        COALESCE((SELECT SUM(amount_idr)             FROM finance_expenses      WHERE finance_period_id = fp.id), 0) AS expenses
+        COALESCE((SELECT SUM(amount_idr)             FROM finance_expenses      WHERE finance_period_id = fp.id), 0) AS expenses,
+        COALESCE((SELECT SUM(amount_idr)             FROM finance_other_income  WHERE finance_period_id = fp.id), 0) AS other_income
       FROM finance_periods fp
       WHERE fp.studio_id = ?
       ORDER BY fp.year DESC, fp.month DESC
@@ -126,7 +133,8 @@ const financeController = {
         year: r.year, month: r.month, status: r.status,
         payroll: parseFloat(r.payroll) || 0,
         expenses: parseFloat(r.expenses) || 0,
-        income: 0, income_count: 0,
+        otherIncome: parseFloat(r.other_income) || 0,
+        shopeeIncome: 0, shopeeCount: 0,
         hasReport: true,
       });
     }
@@ -134,28 +142,38 @@ const financeController = {
       const k = `${r.year}-${r.month}`;
       const existing = map.get(k);
       if (existing) {
-        existing.income = parseFloat(r.income) || 0;
-        existing.income_count = parseInt(r.income_count, 10) || 0;
+        existing.shopeeIncome = parseFloat(r.income) || 0;
+        existing.shopeeCount  = parseInt(r.income_count, 10) || 0;
       } else {
         map.set(k, {
           year: r.year, month: r.month, status: 'draft',
-          payroll: 0, expenses: 0,
-          income: parseFloat(r.income) || 0,
-          income_count: parseInt(r.income_count, 10) || 0,
+          payroll: 0, expenses: 0, otherIncome: 0,
+          shopeeIncome: parseFloat(r.income) || 0,
+          shopeeCount:  parseInt(r.income_count, 10) || 0,
           hasReport: false,
         });
       }
     }
     const months = [...map.values()]
       .sort((a, b) => (b.year - a.year) || (b.month - a.month))
-      .map(m => ({ ...m, label: monthLabel(m.year, m.month), net: m.income - m.payroll - m.expenses }));
+      .map(m => {
+        const income = m.shopeeIncome + m.otherIncome;
+        return {
+          ...m,
+          label: monthLabel(m.year, m.month),
+          income,
+          net: income - m.payroll - m.expenses,
+        };
+      });
 
     const totals = months.reduce((acc, m) => ({
-      income:   acc.income   + m.income,
-      payroll:  acc.payroll  + m.payroll,
-      expenses: acc.expenses + m.expenses,
-      net:      acc.net      + m.net,
-    }), { income: 0, payroll: 0, expenses: 0, net: 0 });
+      income:       acc.income       + m.income,
+      shopeeIncome: acc.shopeeIncome + m.shopeeIncome,
+      otherIncome:  acc.otherIncome  + m.otherIncome,
+      payroll:      acc.payroll      + m.payroll,
+      expenses:     acc.expenses     + m.expenses,
+      net:          acc.net          + m.net,
+    }), { income: 0, shopeeIncome: 0, otherIncome: 0, payroll: 0, expenses: 0, net: 0 });
 
     const now = new Date();
     res.render('finance/studio', {
@@ -248,6 +266,10 @@ const financeController = {
       SELECT * FROM finance_expenses WHERE finance_period_id = ? ORDER BY expense_date DESC, id DESC
     `, [period.id]);
 
+    const [otherIncome] = await db.query(`
+      SELECT * FROM finance_other_income WHERE finance_period_id = ? ORDER BY income_date DESC, id DESC
+    `, [period.id]);
+
     // Per-month income from Shopee distributions for this studio + entries breakdown
     const [incomeEntries] = await db.query(`
       SELECT pe.id, pe.actual_distributed_idr, pe.actual_fx_rate, pe.invoice_date,
@@ -262,13 +284,14 @@ const financeController = {
         AND MONTH(pe.updated_at) = ?
       ORDER BY pe.updated_at DESC
     `, [studioId, y, m]);
-    const income = incomeEntries.reduce((s, e) => s + parseFloat(e.actual_distributed_idr || 0), 0);
 
     const totals = {
-      income,
-      payroll:  staffPayouts.reduce((s, p) => s + parseFloat(p.calculated_amount_idr || 0), 0),
-      expenses: expenses.reduce((s, e) => s + parseFloat(e.amount_idr || 0), 0),
+      shopeeIncome: incomeEntries.reduce((s, e) => s + parseFloat(e.actual_distributed_idr || 0), 0),
+      otherIncome:  otherIncome.reduce((s, o) => s + parseFloat(o.amount_idr || 0), 0),
+      payroll:      staffPayouts.reduce((s, p) => s + parseFloat(p.calculated_amount_idr || 0), 0),
+      expenses:     expenses.reduce((s, e) => s + parseFloat(e.amount_idr || 0), 0),
     };
+    totals.income  = totals.shopeeIncome + totals.otherIncome;
     totals.outflow = totals.payroll + totals.expenses;
     totals.net     = totals.income - totals.outflow;
 
@@ -279,6 +302,7 @@ const financeController = {
       period: { ...period, label: monthLabel(y, m) },
       staffPayouts,
       expenses,
+      otherIncome,
       incomeEntries,
       totals,
     });
@@ -376,6 +400,42 @@ const financeController = {
     const id = parseInt(req.params.id, 10);
     await db.query('DELETE FROM finance_expenses WHERE id=?', [id]);
     req.flash('success', 'Expense deleted.');
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
+  },
+
+  // ── Other income: revenue beyond Shopee distributions (sponsorships, AdSense, etc) ──
+  async postOtherIncomeCreate(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
+    const y = parseInt(req.params.year, 10);
+    const m = parseInt(req.params.month, 10);
+    const { source, description, amount_idr, income_date } = req.body;
+    if (!source || !amount_idr) {
+      req.flash('error', 'Source and amount are required.');
+      return res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
+    }
+    let [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
+    if (!periodRows.length) {
+      await db.query('INSERT INTO finance_periods (studio_id, year, month, created_by) VALUES (?, ?, ?, ?)', [studioId, y, m, req.session.user.id]);
+      [periodRows] = await db.query('SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?', [studioId, y, m]);
+    }
+    const period = periodRows[0];
+    const amount = floorIDR(amount_idr);
+    const date   = income_date && /^\d{4}-\d{2}-\d{2}$/.test(income_date) ? income_date : null;
+    await db.query(`
+      INSERT INTO finance_other_income (finance_period_id, source, description, amount_idr, income_date)
+      VALUES (?, ?, ?, ?, ?)
+    `, [period.id, source.trim(), (description || '').trim() || null, amount, date]);
+    req.flash('success', `Income added — ${source} IDR ${amount.toLocaleString('id-ID')}.`);
+    res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
+  },
+
+  async postOtherIncomeDelete(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
+    const y = parseInt(req.params.year, 10);
+    const m = parseInt(req.params.month, 10);
+    const id = parseInt(req.params.id, 10);
+    await db.query('DELETE FROM finance_other_income WHERE id=?', [id]);
+    req.flash('success', 'Income entry deleted.');
     res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
   },
 
