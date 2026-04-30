@@ -1525,10 +1525,12 @@ const payoutController = {
 
     const rate = await getRate();
     const deductions = await getDeductions();
+    const feeRate = parseFloat(await Setting.get('payout_excel_fee_rate')) || 10;
     const wb = await buildWorkbook({
       entries,
       deductions,
       rate,
+      feeRate,
       mode: periodKey ? 'period' : 'all',
     });
 
