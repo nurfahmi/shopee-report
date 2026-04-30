@@ -59,7 +59,7 @@ const fillSolid = (color) => ({ type: 'pattern', pattern: 'solid', fgColor: { ar
 const thinBorder = { style: 'thin', color: { argb: 'FF888888' } };
 const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
 
-function buildPeriodSheet(workbook, { invoiceDate, deductions, entries, rate, feeRate, paidDate }) {
+function buildPeriodSheet(workbook, { invoiceDate, deductions, entries, rate, feeRate }) {
   // Worksheet name: a Shopee-cycle short tag (e.g. "150426")
   const shortTag = fmtDDMMYY(invoiceDate) || 'undated';
   const ws = workbook.addWorksheet(shortTag, { properties: { defaultRowHeight: 18 } });
@@ -179,36 +179,24 @@ function buildPeriodSheet(workbook, { invoiceDate, deductions, entries, rate, fe
   ws.getCell(feeRow.number, 13).numFmt = moneyFmt;
   ws.getCell(feeRow.number, 13).border = allBorders;
 
-  // Final paid row: balanceToSupplier + FEE RATE, with PAID date stamp.
+  // Final paid row: balanceToSupplier + FEE RATE.
   const lastRow = ws.addRow([]);
   ws.getCell(lastRow.number, 13).value = totals.balanceToSupplier + fee;
   ws.getCell(lastRow.number, 13).numFmt = moneyFmt;
   ws.getCell(lastRow.number, 13).alignment = { horizontal: 'right' };
   ws.getCell(lastRow.number, 13).font = { bold: true, size: 10 };
   ws.getCell(lastRow.number, 13).border = allBorders;
-  if (paidDate) {
-    ws.getCell(lastRow.number, 14).value = `PAID ${fmtDDMMYY(paidDate)}`;
-    ws.getCell(lastRow.number, 14).font = { bold: true, size: 10 };
-    ws.getCell(lastRow.number, 14).alignment = { horizontal: 'left' };
-  }
 
   return { totals, sheet: ws };
 }
 
 // Group entries by invoice_date (one Shopee payout cycle = one period sheet).
-// Returns array of { invoiceDate, entries, paidDate } sorted desc by date.
 function groupByInvoiceDate(entries) {
   const groups = new Map();
   for (const e of entries) {
     const key = e.invoice_date ? new Date(e.invoice_date).toISOString().slice(0, 10) : 'undated';
-    if (!groups.has(key)) groups.set(key, { invoiceDate: e.invoice_date || null, entries: [], paidDate: null });
-    const g = groups.get(key);
-    g.entries.push(e);
-    // Most recent payment_time across the group → "paid" stamp.
-    if (e.payment_time) {
-      const t = new Date(e.payment_time);
-      if (!g.paidDate || t > new Date(g.paidDate)) g.paidDate = e.payment_time;
-    }
+    if (!groups.has(key)) groups.set(key, { invoiceDate: e.invoice_date || null, entries: [] });
+    groups.get(key).entries.push(e);
   }
   return [...groups.values()].sort((a, b) =>
     String(b.invoiceDate || '').localeCompare(String(a.invoiceDate || '')));
@@ -222,16 +210,14 @@ async function buildWorkbook({ entries, deductions, rate, feeRate = 10, mode = '
   const groups = groupByInvoiceDate(entries);
 
   if (mode === 'period') {
-    // Caller passed a single-period entry list; render one sheet.
-    const g = groups[0] || { invoiceDate: null, entries, paidDate: null };
-    buildPeriodSheet(wb, { invoiceDate: g.invoiceDate, deductions, entries: g.entries, rate, feeRate, paidDate: g.paidDate });
+    const g = groups[0] || { invoiceDate: null, entries };
+    buildPeriodSheet(wb, { invoiceDate: g.invoiceDate, deductions, entries: g.entries, rate, feeRate });
   } else {
-    // All periods: one worksheet per invoice_date, newest first.
     if (groups.length === 0) {
-      buildPeriodSheet(wb, { invoiceDate: null, deductions, entries: [], rate, feeRate, paidDate: null });
+      buildPeriodSheet(wb, { invoiceDate: null, deductions, entries: [], rate, feeRate });
     } else {
       for (const g of groups) {
-        buildPeriodSheet(wb, { invoiceDate: g.invoiceDate, deductions, entries: g.entries, rate, feeRate, paidDate: g.paidDate });
+        buildPeriodSheet(wb, { invoiceDate: g.invoiceDate, deductions, entries: g.entries, rate, feeRate });
       }
     }
   }
