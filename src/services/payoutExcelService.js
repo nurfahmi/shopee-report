@@ -168,24 +168,46 @@ function buildPeriodSheet(workbook, { invoiceDate, deductions, entries, rate, fe
     if (colNumber >= 6) cell.numFmt = moneyFmt;
   });
 
-  // FEE RATE row — flat fee added on top of Pay-To-Supplier balance.
+  // FEE RATE row — label sits in col 12 (PER PERSON FEE), value sits in
+  // col 13 (BALANCE AMOUNT — the "Pay To Supplier Indonesia" column).
   const fee = parseFloat(feeRate) || 0;
   const feeRow = ws.addRow([]);
   ws.getCell(feeRow.number, 12).value = 'FEE RATE';
   ws.getCell(feeRow.number, 13).value = fee;
   ws.getCell(feeRow.number, 12).font = { bold: true, size: 10 };
-  ws.getCell(feeRow.number, 12).alignment = { horizontal: 'right' };
-  ws.getCell(feeRow.number, 13).alignment = { horizontal: 'right' };
+  ws.getCell(feeRow.number, 12).alignment = { horizontal: 'right', vertical: 'middle' };
+  ws.getCell(feeRow.number, 13).alignment = { horizontal: 'right', vertical: 'middle' };
   ws.getCell(feeRow.number, 13).numFmt = moneyFmt;
   ws.getCell(feeRow.number, 13).border = allBorders;
+  ws.getCell(feeRow.number, 13).font = { size: 10 };
 
-  // Final paid row: balanceToSupplier + FEE RATE.
+  // Final row: total amount to transfer to Indonesia = balanceToSupplier + FEE RATE.
+  // Sits in col 13 (under BALANCE AMOUNT). PAID stamp (when applicable) sits in col 14.
   const lastRow = ws.addRow([]);
   ws.getCell(lastRow.number, 13).value = totals.balanceToSupplier + fee;
   ws.getCell(lastRow.number, 13).numFmt = moneyFmt;
-  ws.getCell(lastRow.number, 13).alignment = { horizontal: 'right' };
+  ws.getCell(lastRow.number, 13).alignment = { horizontal: 'right', vertical: 'middle' };
   ws.getCell(lastRow.number, 13).font = { bold: true, size: 10 };
   ws.getCell(lastRow.number, 13).border = allBorders;
+  ws.getCell(lastRow.number, 13).fill = fillSolid('FFFFF2CC');
+
+  // PAID stamp — only once at least one entry has moved past 'collected'
+  // (i.e. transferred to Indonesia or further along the pipeline).
+  const TRANSFERRED = new Set(['transferring', 'received', 'distributed', 'completed']);
+  let paidDate = null;
+  for (const e of entries) {
+    if (!TRANSFERRED.has(e.payment_status)) continue;
+    const stamp = e.updated_at || e.payment_time;
+    if (!stamp) continue;
+    const t = new Date(stamp);
+    if (Number.isNaN(t.getTime())) continue;
+    if (!paidDate || t > new Date(paidDate)) paidDate = stamp;
+  }
+  if (paidDate) {
+    ws.getCell(lastRow.number, 14).value = `PAID ${fmtDDMMYY(paidDate)}`;
+    ws.getCell(lastRow.number, 14).font = { bold: true, size: 10 };
+    ws.getCell(lastRow.number, 14).alignment = { horizontal: 'left', vertical: 'middle' };
+  }
 
   return { totals, sheet: ws };
 }
