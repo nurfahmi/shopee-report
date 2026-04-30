@@ -114,7 +114,7 @@ function buildPeriodSheet(workbook, { invoiceDate, deductions, entries, rate, pa
 
     const row = ws.addRow([
       fmtDDDOTMMYYYY(e.invoice_date),
-      fmtDDDOTMMYYYY(e.payment_time || e.updated_at),
+      e.payment_time ? fmtDDDOTMMYYYY(e.payment_time) : '',
       e.affiliate_name || e.extracted_name || '',
       [e.bank_name, e.account_number].filter(Boolean).join(' — '),
       e.invoice_number || '',
