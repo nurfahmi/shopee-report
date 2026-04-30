@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const payoutController = require('../controllers/payoutController');
-const { requireAuth, requireStudioOrUp } = require('../middleware/auth');
+const { requireAuth, requireStudioOrUp, requireAnyAdmin } = require('../middleware/auth');
 const { shopeeInvoiceUpload } = require('../middleware/upload');
 const multer = require('multer');
 
@@ -63,6 +63,9 @@ router.post('/studio-payments/:studioId/distribute',
 
 // Period report PDF (SA + MY admin) — must come before /:id
 router.get('/report/:periodId', payoutController.getPeriodReport);
+
+// Excel export (MY admin / ID admin / SA) — per-period or all periods
+router.get('/export/excel', requireAnyAdmin, payoutController.getExportExcel);
 
 // Status update
 router.post('/:id/status', proofUpload.single('proof'), payoutController.postUpdateStatus);

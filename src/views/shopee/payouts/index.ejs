@@ -38,6 +38,14 @@
       </p>
     </div>
     <div class="flex items-center gap-2 text-xs">
+      <% if (isMYAdmin || isSuperAdmin || user.role === 'indonesia_admin') { %>
+        <a href="/shopee/payouts/export/excel"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-semibold tracking-wide transition shadow-sm"
+           title="Export all periods to Excel">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Export Excel · All
+        </a>
+      <% } %>
       <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full font-medium ring-1 ring-indigo-100 tabular-nums">
         FX 1 MYR ≈ <%= rate.toLocaleString() %> IDR
         <% if (rateMeta && rateMeta.updated_at) { %><span class="text-indigo-400">· <%= relativeTime(rateMeta.updated_at) %></span><% } %>
@@ -251,6 +259,15 @@
                 </button>
               </form>
             <% }) %>
+          <% } %>
+          <% if ((isMYAdmin || isSuperAdmin || user.role === 'indonesia_admin') && period.invoice_date) { %>
+            <a href="/shopee/payouts/export/excel?period=<%= encodeURIComponent(period.invoice_date) %>"
+               onclick="event.stopPropagation();"
+               class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:ring-emerald-300 text-[10.5px] font-semibold tracking-wide uppercase rounded-lg transition whitespace-nowrap"
+               title="Export this period to Excel">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              Excel
+            </a>
           <% } %>
           <span class="text-[11px] font-semibold text-slate-900 tabular-nums">
             <% if (topLineLabel) { %><span class="text-[10px] text-slate-500 font-normal mr-1"><%= topLineLabel %></span><% } %>

@@ -1487,6 +1487,61 @@ const payoutController = {
       generatedBy: user
     }, filename);
     res.download(outputPath, `${period.period_number}.pdf`);
+  },
+
+  // ── Excel export of MY admin's reconciliation sheet ────────────
+  // ?period=YYYY-MM-DD → single-period workbook; omitted → all periods.
+  // Allowed for: malaysia_admin, indonesia_admin, superadmin.
+  async getExportExcel(req, res) {
+    const user = req.session.user;
+    if (!['superadmin', 'malaysia_admin', 'indonesia_admin'].includes(user.role)) {
+      return res.status(403).render('error', {
+        title: 'Access Denied',
+        message: 'You do not have permission to export payouts.',
+        user
+      });
+    }
+
+    const { buildWorkbook, fmtDDMMYY } = require('../services/payoutExcelService');
+    const periodKey = (req.query.period || '').trim();
+
+    const allEntries = await PayoutEntry.findAll({});
+    const entries = periodKey
+      ? allEntries.filter(e => {
+          if (!e.invoice_date) return periodKey === 'undated';
+          const k = new Date(e.invoice_date);
+          if (Number.isNaN(k.getTime())) return false;
+          const yyyy = k.getFullYear();
+          const mm = String(k.getMonth() + 1).padStart(2, '0');
+          const dd = String(k.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}` === periodKey;
+        })
+      : allEntries;
+
+    if (periodKey && entries.length === 0) {
+      req.flash('error', 'No entries found for this period.');
+      return res.redirect('/shopee/payouts');
+    }
+
+    const rate = await getRate();
+    const deductions = await getDeductions();
+    const wb = await buildWorkbook({
+      entries,
+      deductions,
+      rate,
+      mode: periodKey ? 'period' : 'all',
+    });
+
+    const filenameTag = periodKey
+      ? fmtDDMMYY(periodKey === 'undated' ? null : periodKey) || 'undated'
+      : `all-${fmtDDMMYY(new Date())}`;
+    const filename = `payout-portion-${filenameTag}.xlsx`;
+
+    res.setHeader('Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await wb.xlsx.write(res);
+    res.end();
   }
 };
 
