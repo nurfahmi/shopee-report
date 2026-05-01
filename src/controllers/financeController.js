@@ -498,6 +498,11 @@ const financeController = {
       req.flash('error', 'Nama dan tipe gaji wajib diisi.');
       return res.redirect(`/finance/${studioId}/staff`);
     }
+    const newHourly    = salary_type === 'hourly' ? (parseFloat(hourly_rate_idr) || 0) : null;
+    const newMonthly   = salary_type === 'fixed'  ? (parseFloat(monthly_salary_idr) || 0) : null;
+    const newCashback  = lunch_cashback_per_day_idr ? (parseFloat(lunch_cashback_per_day_idr) || 0) : null;
+    const newTunjangan = tunjangan_idr ? (parseFloat(tunjangan_idr) || 0) : null;
+
     await db.query(`
       UPDATE finance_staff
       SET name=?, role_title=?, salary_type=?, hourly_rate_idr=?, monthly_salary_idr=?,
@@ -507,15 +512,49 @@ const financeController = {
       name.trim(),
       (role_title || '').trim() || null,
       salary_type,
-      salary_type === 'hourly' ? (parseFloat(hourly_rate_idr) || 0) : null,
-      salary_type === 'fixed'  ? (parseFloat(monthly_salary_idr) || 0) : null,
-      lunch_cashback_per_day_idr ? (parseFloat(lunch_cashback_per_day_idr) || 0) : null,
-      tunjangan_idr               ? (parseFloat(tunjangan_idr)               || 0) : null,
+      newHourly, newMonthly, newCashback, newTunjangan,
       (notes || '').trim() || null,
       is_active ? 1 : 0,
       id, studioId,
     ]);
-    req.flash('success', `${name} diperbarui.`);
+
+    // Propagate edits to all DRAFT periods: re-snapshot rates & recalculate.
+    // Final periods stay frozen so historical reports remain accurate.
+    const [draftPayouts] = await db.query(`
+      SELECT fsp.id, fsp.hours_worked, fsp.days_worked
+      FROM finance_staff_payouts fsp
+      JOIN finance_periods fp ON fp.id = fsp.finance_period_id
+      WHERE fsp.staff_id = ? AND fp.status = 'draft'
+    `, [id]);
+
+    let resyncedCount = 0;
+    for (const p of draftPayouts) {
+      const calculated = floorIDR(calcStaffPayout({
+        salary_type,
+        hourly_rate:    newHourly,
+        monthly_salary: newMonthly,
+        lunch_cashback: newCashback,
+        tunjangan:      newTunjangan,
+        hours: p.hours_worked,
+        days:  p.days_worked,
+      }));
+      await db.query(`
+        UPDATE finance_staff_payouts
+        SET salary_type_snapshot         = ?,
+            hourly_rate_snapshot_idr     = ?,
+            monthly_salary_snapshot_idr  = ?,
+            lunch_cashback_snapshot_idr  = ?,
+            tunjangan_snapshot_idr       = ?,
+            calculated_amount_idr        = ?
+        WHERE id = ?
+      `, [salary_type, newHourly, newMonthly, newCashback, newTunjangan, calculated, p.id]);
+      resyncedCount++;
+    }
+
+    const tail = resyncedCount > 0
+      ? ` · ${resyncedCount} bulan draft disinkronkan ulang.`
+      : '';
+    req.flash('success', `${name} diperbarui.${tail}`);
     res.redirect(`/finance/${studioId}/staff`);
   },
 
