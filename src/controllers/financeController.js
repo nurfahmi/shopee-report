@@ -9,20 +9,22 @@ const Studio = require('../models/Studio');
 const floorIDR = (n) => Math.floor(Math.max(0, parseFloat(n) || 0) / 100) * 100;
 
 // ── salary calc: single source of truth ────────────────────────────
-// Hourly: hours × rate + days × cashback
-// Fixed:  monthly_salary + days × cashback
-function calcStaffPayout({ salary_type, hourly_rate, monthly_salary, lunch_cashback, hours, days }) {
+// Hourly: hours × rate + days × cashback + tunjangan
+// Fixed:  monthly_salary + days × cashback + tunjangan
+function calcStaffPayout({ salary_type, hourly_rate, monthly_salary, lunch_cashback, tunjangan, hours, days }) {
   const h    = parseFloat(hours)            || 0;
   const d    = parseInt(days, 10)           || 0;
   const hr   = parseFloat(hourly_rate)      || 0;
   const ms   = parseFloat(monthly_salary)   || 0;
   const cb   = parseFloat(lunch_cashback)   || 0;
+  const tj   = parseFloat(tunjangan)        || 0;
   const lunchTotal = d * cb;
   const base = salary_type === 'fixed' ? ms : (h * hr);
-  return base + lunchTotal;
+  return base + lunchTotal + tj;
 }
 
-const monthLabel = (y, m) => new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+// Bahasa Indonesia month label for the finance module UI.
+const monthLabel = (y, m) => new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
 // Shopee income for a studio in a given (year, month):
 // sum of actual_distributed_idr from payout entries that were marked
@@ -231,7 +233,8 @@ const financeController = {
              fs.salary_type AS current_salary_type,
              fs.hourly_rate_idr AS current_hourly_rate,
              fs.monthly_salary_idr AS current_monthly_salary,
-             fs.lunch_cashback_per_day_idr AS current_lunch_cashback
+             fs.lunch_cashback_per_day_idr AS current_lunch_cashback,
+             fs.tunjangan_idr AS current_tunjangan
       FROM finance_staff_payouts fsp
       JOIN finance_staff fs ON fs.id = fsp.staff_id
       WHERE fsp.finance_period_id = ?
@@ -252,11 +255,13 @@ const financeController = {
       hourly_rate_snapshot_idr: s.hourly_rate_idr,
       monthly_salary_snapshot_idr: s.monthly_salary_idr,
       lunch_cashback_snapshot_idr: s.lunch_cashback_per_day_idr,
+      tunjangan_snapshot_idr: s.tunjangan_idr,
       calculated_amount_idr: 0,
       current_salary_type:    s.salary_type,
       current_hourly_rate:    s.hourly_rate_idr,
       current_monthly_salary: s.monthly_salary_idr,
       current_lunch_cashback: s.lunch_cashback_per_day_idr,
+      current_tunjangan:      s.tunjangan_idr,
     });
     for (const p of payoutRows) {
       if (!staffPayouts.some(sp => sp.staff_id === p.staff_id)) staffPayouts.push(p);
@@ -340,6 +345,7 @@ const financeController = {
       hourly_rate:    staff.hourly_rate_idr,
       monthly_salary: staff.monthly_salary_idr,
       lunch_cashback: staff.lunch_cashback_per_day_idr,
+      tunjangan:      staff.tunjangan_idr,
       hours, days,
     }));
 
@@ -347,8 +353,9 @@ const financeController = {
       INSERT INTO finance_staff_payouts
         (finance_period_id, staff_id, hours_worked, days_worked,
          salary_type_snapshot, hourly_rate_snapshot_idr, monthly_salary_snapshot_idr,
-         lunch_cashback_snapshot_idr, calculated_amount_idr, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         lunch_cashback_snapshot_idr, tunjangan_snapshot_idr,
+         calculated_amount_idr, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         hours_worked = VALUES(hours_worked),
         days_worked  = VALUES(days_worked),
@@ -356,15 +363,17 @@ const financeController = {
         hourly_rate_snapshot_idr     = VALUES(hourly_rate_snapshot_idr),
         monthly_salary_snapshot_idr  = VALUES(monthly_salary_snapshot_idr),
         lunch_cashback_snapshot_idr  = VALUES(lunch_cashback_snapshot_idr),
+        tunjangan_snapshot_idr       = VALUES(tunjangan_snapshot_idr),
         calculated_amount_idr        = VALUES(calculated_amount_idr),
         notes = VALUES(notes)
     `, [
       period.id, staffId, hours, days,
       staff.salary_type, staff.hourly_rate_idr, staff.monthly_salary_idr,
-      staff.lunch_cashback_per_day_idr, calculated, notes,
+      staff.lunch_cashback_per_day_idr, staff.tunjangan_idr,
+      calculated, notes,
     ]);
 
-    req.flash('success', `Saved ${staff.name} payout — IDR ${calculated.toLocaleString('id-ID')}.`);
+    req.flash('success', `Gaji ${staff.name} disimpan — IDR ${calculated.toLocaleString('id-ID')}.`);
     res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
   },
 
@@ -455,14 +464,16 @@ const financeController = {
 
   async postStaffCreate(req, res) {
     const studioId = parseInt(req.params.studioId, 10);
-    const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes } = req.body;
+    const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr,
+            lunch_cashback_per_day_idr, tunjangan_idr, notes } = req.body;
     if (!studioId || !name || !['hourly','fixed'].includes(salary_type)) {
-      req.flash('error', 'Name and a valid salary type are required.');
+      req.flash('error', 'Nama dan tipe gaji wajib diisi.');
       return res.redirect(`/finance/${studioId}/staff`);
     }
     await db.query(`
-      INSERT INTO finance_staff (studio_id, name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO finance_staff (studio_id, name, role_title, salary_type,
+        hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, tunjangan_idr, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       studioId,
       name.trim(),
@@ -471,24 +482,26 @@ const financeController = {
       salary_type === 'hourly' ? (parseFloat(hourly_rate_idr) || 0) : null,
       salary_type === 'fixed'  ? (parseFloat(monthly_salary_idr) || 0) : null,
       lunch_cashback_per_day_idr ? (parseFloat(lunch_cashback_per_day_idr) || 0) : null,
+      tunjangan_idr               ? (parseFloat(tunjangan_idr)               || 0) : null,
       (notes || '').trim() || null,
     ]);
-    req.flash('success', `${name} added.`);
+    req.flash('success', `${name} ditambahkan.`);
     res.redirect(`/finance/${studioId}/staff`);
   },
 
   async postStaffUpdate(req, res) {
     const studioId = parseInt(req.params.studioId, 10);
     const id = parseInt(req.params.id, 10);
-    const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr, lunch_cashback_per_day_idr, notes, is_active } = req.body;
+    const { name, role_title, salary_type, hourly_rate_idr, monthly_salary_idr,
+            lunch_cashback_per_day_idr, tunjangan_idr, notes, is_active } = req.body;
     if (!name || !['hourly','fixed'].includes(salary_type)) {
-      req.flash('error', 'Name and a valid salary type are required.');
+      req.flash('error', 'Nama dan tipe gaji wajib diisi.');
       return res.redirect(`/finance/${studioId}/staff`);
     }
     await db.query(`
       UPDATE finance_staff
       SET name=?, role_title=?, salary_type=?, hourly_rate_idr=?, monthly_salary_idr=?,
-          lunch_cashback_per_day_idr=?, notes=?, is_active=?
+          lunch_cashback_per_day_idr=?, tunjangan_idr=?, notes=?, is_active=?
       WHERE id=? AND studio_id=?
     `, [
       name.trim(),
@@ -497,11 +510,12 @@ const financeController = {
       salary_type === 'hourly' ? (parseFloat(hourly_rate_idr) || 0) : null,
       salary_type === 'fixed'  ? (parseFloat(monthly_salary_idr) || 0) : null,
       lunch_cashback_per_day_idr ? (parseFloat(lunch_cashback_per_day_idr) || 0) : null,
+      tunjangan_idr               ? (parseFloat(tunjangan_idr)               || 0) : null,
       (notes || '').trim() || null,
       is_active ? 1 : 0,
       id, studioId,
     ]);
-    req.flash('success', `${name} updated.`);
+    req.flash('success', `${name} diperbarui.`);
     res.redirect(`/finance/${studioId}/staff`);
   },
 
@@ -509,8 +523,69 @@ const financeController = {
     const studioId = parseInt(req.params.studioId, 10);
     const id = parseInt(req.params.id, 10);
     await db.query('UPDATE finance_staff SET is_active=0 WHERE id=? AND studio_id=?', [id, studioId]);
-    req.flash('success', 'Staff deactivated (history preserved).');
+    req.flash('success', 'Karyawan dinonaktifkan (riwayat tetap tersimpan).');
     res.redirect(`/finance/${studioId}/staff`);
+  },
+
+  // ── Slip Gaji (Payslip) PDF for one staff member in one period ──
+  async getPayslip(req, res) {
+    const studioId = parseInt(req.params.studioId, 10);
+    const y        = parseInt(req.params.year, 10);
+    const m        = parseInt(req.params.month, 10);
+    const staffId  = parseInt(req.params.staffId, 10);
+    if (!studioId || !staffId || !Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
+      req.flash('error', 'Periode tidak valid.');
+      return res.redirect('/finance');
+    }
+    const studio = await Studio.findById(studioId);
+    if (!studio) { req.flash('error', 'Studio tidak ditemukan.'); return res.redirect('/finance'); }
+
+    const [staffRows] = await db.query(
+      'SELECT * FROM finance_staff WHERE id=? AND studio_id=?', [staffId, studioId]);
+    if (!staffRows.length) {
+      req.flash('error', 'Karyawan tidak ditemukan di studio ini.');
+      return res.redirect(`/finance/${studioId}/${y}/${String(m).padStart(2,'0')}`);
+    }
+    const staff = staffRows[0];
+
+    const [periodRows] = await db.query(
+      'SELECT * FROM finance_periods WHERE studio_id=? AND year=? AND month=?',
+      [studioId, y, m]);
+    const period = periodRows[0] || null;
+
+    // Pull saved payout for this staff in this period (snapshot rates).
+    let payout = null;
+    if (period) {
+      const [payRows] = await db.query(
+        'SELECT * FROM finance_staff_payouts WHERE finance_period_id=? AND staff_id=?',
+        [period.id, staffId]);
+      payout = payRows[0] || null;
+    }
+
+    // Fall back to current settings if no saved payout (zero hours/days).
+    const salaryType = payout?.salary_type_snapshot         ?? staff.salary_type;
+    const hourlyRate = parseFloat(payout?.hourly_rate_snapshot_idr    ?? staff.hourly_rate_idr)            || 0;
+    const monthly    = parseFloat(payout?.monthly_salary_snapshot_idr ?? staff.monthly_salary_idr)         || 0;
+    const cashback   = parseFloat(payout?.lunch_cashback_snapshot_idr ?? staff.lunch_cashback_per_day_idr) || 0;
+    const tunjangan  = parseFloat(payout?.tunjangan_snapshot_idr      ?? staff.tunjangan_idr)              || 0;
+    const hours      = parseFloat(payout?.hours_worked) || 0;
+    const days       = parseInt(payout?.days_worked, 10) || 0;
+
+    const base       = salaryType === 'fixed' ? monthly : (hours * hourlyRate);
+    const lunchTotal = days * cashback;
+    const total      = floorIDR(base + lunchTotal + tunjangan);
+
+    const { renderPDF } = require('../services/pdfService');
+    const filename = `slip-gaji-${staff.name.replace(/[^a-z0-9]+/gi, '-')}-${y}${String(m).padStart(2,'0')}-${Date.now()}.pdf`;
+    const periodLabel = monthLabel(y, m);
+    const outputPath = await renderPDF('payslip', {
+      studio, staff, period, periodLabel, payout,
+      salaryType, hourlyRate, monthly, cashback, tunjangan,
+      hours, days, base, lunchTotal, total,
+      generatedAt: new Date(),
+      generatedBy: req.session.user,
+    }, filename);
+    res.download(outputPath, `Slip-Gaji-${staff.name}-${periodLabel}.pdf`);
   },
 };
 

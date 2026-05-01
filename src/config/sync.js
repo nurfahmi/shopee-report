@@ -221,6 +221,7 @@ async function syncDatabase() {
       hourly_rate_idr             DECIMAL(15,2) NULL,
       monthly_salary_idr          DECIMAL(15,2) NULL,
       lunch_cashback_per_day_idr  DECIMAL(12,2) NULL,
+      tunjangan_idr               DECIMAL(15,2) NULL,
       notes                       TEXT NULL,
       is_active                   TINYINT(1) NOT NULL DEFAULT 1,
       created_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -249,6 +250,7 @@ async function syncDatabase() {
       hourly_rate_snapshot_idr      DECIMAL(15,2) NULL,
       monthly_salary_snapshot_idr   DECIMAL(15,2) NULL,
       lunch_cashback_snapshot_idr   DECIMAL(12,2) NULL,
+      tunjangan_snapshot_idr        DECIMAL(15,2) NULL,
       calculated_amount_idr         DECIMAL(15,2) NOT NULL DEFAULT 0,
       notes                         TEXT NULL,
       created_at                    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -338,6 +340,13 @@ async function syncDatabase() {
   // so each studio gets its own P&L (income from Shopee distributions − payroll − expenses).
   await addColumnIfMissing(connection, 'finance_staff',   'studio_id', 'INT NULL AFTER id');
   await addColumnIfMissing(connection, 'finance_periods', 'studio_id', 'INT NULL AFTER id');
+
+  // Tunjangan (allowance): optional fixed monthly stipend in IDR (e.g. transport,
+  // health). Added on top of base salary and lunch cashback.
+  await addColumnIfMissing(connection, 'finance_staff', 'tunjangan_idr',
+    'DECIMAL(15,2) NULL AFTER lunch_cashback_per_day_idr');
+  await addColumnIfMissing(connection, 'finance_staff_payouts', 'tunjangan_snapshot_idr',
+    'DECIMAL(15,2) NULL AFTER lunch_cashback_snapshot_idr');
   // Swap the unique key from (year, month) -> (studio_id, year, month). Both wrapped
   // in try/catch since they may already be in the desired state.
   try { await connection.query('ALTER TABLE finance_periods DROP INDEX uniq_finance_year_month'); } catch(e) {}

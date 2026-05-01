@@ -1,15 +1,16 @@
 <%
   const fmtIDR = n => (Math.floor(Math.max(0, parseFloat(n||0)) / 100) * 100).toLocaleString('id-ID');
-  // Landing — pick a studio. Each card shows current month income / payroll /
-  // expenses / net P&L so admin gets a glanceable read of every studio's health.
+  // Halaman utama — pilih studio. Setiap kartu menampilkan ringkasan pemasukan,
+  // gaji, pengeluaran, dan laba bersih bulan ini supaya admin langsung melihat
+  // kondisi tiap studio.
 %>
 
 <div class="max-w-6xl">
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
     <div>
-      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Studio Finance</h1>
+      <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Keuangan Studio</h1>
       <p class="text-slate-500 text-sm mt-1">
-        Per-studio bookkeeping · income from Shopee distributions, staff payroll, monthly expenses (IDR)
+        Pembukuan per studio · pemasukan dari distribusi Shopee, gaji karyawan, pengeluaran bulanan (IDR)
         · <%= currentLabel %>
       </p>
     </div>
@@ -17,7 +18,7 @@
 
   <% if (!studios.length) { %>
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-10 text-center text-slate-400 text-sm">
-      No studios yet. <a href="/studios/create" class="text-indigo-600 hover:underline font-semibold">Create one</a> first.
+      Belum ada studio. <a href="/studios/create" class="text-indigo-600 hover:underline font-semibold">Buat studio</a> terlebih dahulu.
     </div>
   <% } else { %>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -30,27 +31,27 @@
             <div class="min-w-0">
               <h2 class="text-[16px] font-bold text-slate-900 tracking-tight truncate"><%= s.name %></h2>
               <p class="text-[11px] text-slate-500 mt-0.5">
-                <%= s.activeStaff %> active staff
-                · <%= s.shopeeIncomeCount %> Shopee<%= s.otherIncomeCount > 0 ? ` + ${s.otherIncomeCount} other` : '' %> this month
+                <%= s.activeStaff %> karyawan aktif
+                · <%= s.shopeeIncomeCount %> Shopee<%= s.otherIncomeCount > 0 ? ` + ${s.otherIncomeCount} lainnya` : '' %> bulan ini
               </p>
             </div>
-            <span class="text-[10px] font-semibold tracking-wide uppercase text-slate-400 group-hover:text-slate-700 transition">Open →</span>
+            <span class="text-[10px] font-semibold tracking-wide uppercase text-slate-400 group-hover:text-slate-700 transition">Buka →</span>
           </div>
 
           <div class="grid grid-cols-3 gap-3 text-[12px] tabular-nums">
             <div>
-              <p class="text-[9.5px] font-semibold text-emerald-600 uppercase tracking-wider">Income</p>
+              <p class="text-[9.5px] font-semibold text-emerald-600 uppercase tracking-wider">Pemasukan</p>
               <p class="text-emerald-700 font-bold mt-0.5">IDR <%= fmtIDR(s.income) %></p>
             </div>
             <div>
-              <p class="text-[9.5px] font-semibold text-rose-500 uppercase tracking-wider">Outflow</p>
+              <p class="text-[9.5px] font-semibold text-rose-500 uppercase tracking-wider">Pengeluaran</p>
               <p class="text-rose-700 font-bold mt-0.5">IDR <%= fmtIDR(s.payroll + s.expenses) %></p>
-              <p class="text-[10px] text-slate-400 mt-0.5">payroll <%= s.payrollCount %> · exp <%= s.expenseCount %></p>
+              <p class="text-[10px] text-slate-400 mt-0.5">gaji <%= s.payrollCount %> · biaya <%= s.expenseCount %></p>
             </div>
             <div>
-              <p class="text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider">Net</p>
+              <p class="text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider">Laba Bersih</p>
               <p class="<%= netCls %> font-bold mt-0.5">IDR <%= fmtIDR(s.net) %></p>
-              <% if (!hasActivity) { %><p class="text-[10px] text-slate-400 mt-0.5">no data yet</p><% } %>
+              <% if (!hasActivity) { %><p class="text-[10px] text-slate-400 mt-0.5">belum ada data</p><% } %>
             </div>
           </div>
         </a>
